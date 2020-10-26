@@ -33,6 +33,12 @@ type DBUser struct {
 	LoginCache       LoginCache   `bson:"login_cache,omitempty"`
 	FavoriteProjects []string     `bson:"favorite_projects"`
 	OnlyAPI          bool         `bson:"only_api,omitempty"`
+	Bonusly          BonuslyInfo  `bson:"bonusly,omitempty"`
+}
+
+type BonuslyInfo struct {
+	UserName    string `bson:"username,omitempty"`
+	AccessToken string `bson:"access_token,omitempty"`
 }
 
 func (u *DBUser) MarshalBSON() ([]byte, error)  { return mgobson.Marshal(u) }
