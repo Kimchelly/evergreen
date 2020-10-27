@@ -10,6 +10,7 @@ import (
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/alertrecord"
+	"github.com/evergreen-ci/evergreen/model/bonusly/pool"
 	"github.com/evergreen-ci/evergreen/model/build"
 	"github.com/evergreen-ci/evergreen/model/event"
 	"github.com/evergreen-ci/evergreen/model/host"
@@ -414,6 +415,30 @@ func (t *taskTriggers) taskOutcome(sub *event.Subscription) (*notification.Notif
 	}
 
 	return t.generate(sub, "", "")
+}
+
+func (t *taskTriggers) handleBonuslyBets() error {
+	bps, err := pool.FindAll(pool.ByTaskID(t.task.Id))
+	if err != nil {
+		return errors.Wrap(err, "finding betting pools")
+	}
+
+	catcher := grip.NewBasicCatcher()
+	for _, bp := range bps {
+		outcome, err := bp.DecideOutcome(t.data.Status)
+		if err != nil {
+			catcher.Wrapf(err, "betting pool '%s'", bp.ID)
+			continue
+		}
+		if err := outcome.Validate(); err != nil {
+			catcher.Wrap(err, "cannot distribute Bonusly betting pool")
+			continue
+		}
+		if err := outcome.Distribute(); err != nil {
+			catcher.Wrap(err, "distributing Bonusly betting pool to winners")
+		}
+	}
+	return catcher.Resolve()
 }
 
 func (t *taskTriggers) taskFailure(sub *event.Subscription) (*notification.Notification, error) {

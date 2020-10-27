@@ -7,11 +7,13 @@ import (
 
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/model"
+	"github.com/evergreen-ci/evergreen/model/bonusly/pool"
 	"github.com/evergreen-ci/evergreen/model/event"
 	"github.com/evergreen-ci/evergreen/model/notification"
 	"github.com/evergreen-ci/evergreen/model/task"
 	restModel "github.com/evergreen-ci/evergreen/rest/model"
 	"github.com/evergreen-ci/utility"
+	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/message"
 	"github.com/pkg/errors"
 )
@@ -153,7 +155,37 @@ func (t *versionTriggers) versionOutcome(sub *event.Subscription) (*notification
 		return nil, nil
 	}
 
+	if err := t.handleBonuslyBets(); err != nil {
+		grip.Error(message.WrapError(err, message.Fields{
+			"version": t.version.Id,
+		}))
+	}
+
 	return t.generate(sub, "")
+}
+
+func (t *versionTriggers) handleBonuslyBets() error {
+	bps, err := pool.FindAll(pool.ByVersionID(t.version.Id))
+	if err != nil {
+		return errors.Wrap(err, "finding betting pools")
+	}
+
+	catcher := grip.NewBasicCatcher()
+	for _, bp := range bps {
+		outcome, err := bp.DecideOutcome(t.data.Status)
+		if err != nil {
+			catcher.Wrapf(err, "betting pool '%s'", bp.ID)
+			continue
+		}
+		if err := outcome.Validate(); err != nil {
+			catcher.Wrap(err, "cannot distribute Bonusly betting pool")
+			continue
+		}
+		if err := outcome.Distribute(); err != nil {
+			catcher.Wrap(err, "distributing Bonusly betting pool to winners")
+		}
+	}
+	return catcher.Resolve()
 }
 
 func (t *versionTriggers) versionFailure(sub *event.Subscription) (*notification.Notification, error) {
