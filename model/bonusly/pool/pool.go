@@ -29,14 +29,15 @@ type BettingPool struct {
 }
 
 var (
-	allowedTaskStatuses = []string{
-		evergreen.TaskInactive,
-		evergreen.TaskStatusBlocked,
-		evergreen.TaskStatusPending,
-		evergreen.TaskUndispatched,
-		evergreen.TaskDispatched,
+	allowedTaskOutcomes = []string{
+		evergreen.TaskSucceeded,
+		evergreen.TaskFailed,
+		evergreen.TaskSystemFailed,
+		evergreen.TaskTestTimedOut,
+		evergreen.TaskSetupFailed,
 	}
-	allowedVersionStatuses = []string{
+
+	allowedVersionOutcomes = []string{
 		evergreen.VersionFailed,
 		evergreen.VersionSucceeded,
 	}
@@ -71,10 +72,10 @@ func (bp *BettingPool) ValidateBet(b bet.Bet) error {
 
 	catcher.Add(b.Validate())
 	catcher.ErrorfWhen(b.Amount < bp.MinimumBet, "bet amount is too low, the minimum bet for the pool is %d", bp.MinimumBet)
-	catcher.ErrorfWhen(bp.TaskID != "" && !utility.StringSliceContains(allowedTaskStatuses, b.ExpectedStatus),
-		"status '%s' is not a valid task status for making a bet -  allowed status are %s", b.ExpectedStatus, strings.Join(allowedTaskStatuses, ", "))
-	catcher.ErrorfWhen(bp.VersionID != "" && !utility.StringSliceContains(allowedVersionStatuses, b.ExpectedStatus),
-		"status '%s' is not a valid version status for making a bet - allowed statuses are %s", b.ExpectedStatus, strings.Join(allowedVersionStatuses, ","))
+	catcher.ErrorfWhen(bp.TaskID != "" && !utility.StringSliceContains(allowedTaskOutcomes, b.ExpectedStatus),
+		"status '%s' is not a valid task outcome for a bet -  allowed outcome are %s", b.ExpectedStatus, strings.Join(allowedTaskOutcomes, ", "))
+	catcher.ErrorfWhen(bp.VersionID != "" && !utility.StringSliceContains(allowedVersionOutcomes, b.ExpectedStatus),
+		"status '%s' is not a valid version outcome for a bet - allowed outcomes are %s", b.ExpectedStatus, strings.Join(allowedVersionOutcomes, ", "))
 
 	return errors.Wrapf(catcher.Resolve(), "invalid bet '%s' placed by user '%s'", b.ID, b.UserID)
 }
@@ -136,6 +137,9 @@ func (bp *BettingPool) AddBet(b *bet.Bet) error {
 	})); err != nil {
 		return errors.Wrap(err, "adding new bet to pool")
 	}
+
+	bp.BetIDs = append(bp.BetIDs, b.ID)
+
 	return nil
 }
 

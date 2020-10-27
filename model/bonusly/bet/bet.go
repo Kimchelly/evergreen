@@ -4,9 +4,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/db"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/user"
+	"github.com/evergreen-ci/utility"
 	"github.com/kimchelly/go-bonusly"
 	"github.com/mongodb/grip"
 	"github.com/pkg/errors"
@@ -122,4 +124,31 @@ func (b *Bet) ValidateAmount() error {
 // Insert inserts a new bet into the collection.
 func (b *Bet) Insert() error {
 	return db.Insert(Collection, b)
+}
+
+var (
+	validBetSubmissionTaskStatuses = []string{
+		evergreen.TaskInactive,
+		evergreen.TaskStatusBlocked,
+		evergreen.TaskStatusPending,
+		evergreen.TaskUndispatched,
+		evergreen.TaskDispatched,
+	}
+	validBetSubmissionVersionStatuses = []string{
+		evergreen.VersionCreated,
+	}
+)
+
+func ValidateBetSubmissionStatusForTask(status string) error {
+	if !utility.StringSliceContains(validBetSubmissionTaskStatuses, status) {
+		return errors.Errorf("cannot submit bet when task status is '%s'", status)
+	}
+	return nil
+}
+
+func ValidateBetSubmissionStatusForVersion(status string) error {
+	if !utility.StringSliceContains(validBetSubmissionVersionStatuses, status) {
+		return errors.Errorf("cannot submit bet when version status is '%s'", status)
+	}
+	return nil
 }
