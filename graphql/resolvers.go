@@ -19,6 +19,7 @@ import (
 	"github.com/evergreen-ci/evergreen/apimodels"
 	"github.com/evergreen-ci/evergreen/cloud"
 	"github.com/evergreen-ci/evergreen/model"
+	"github.com/evergreen-ci/evergreen/model/bonusly/bet"
 	"github.com/evergreen-ci/evergreen/model/build"
 	"github.com/evergreen-ci/evergreen/model/comment"
 	"github.com/evergreen-ci/evergreen/model/commitqueue"
@@ -1598,6 +1599,16 @@ func (r *mutationResolver) AddComment(ctx context.Context, resourceType string, 
 		Message:      message,
 		ThreadId:     thread,
 		UserId:       authUser.Username(),
+	}
+	if bet.IsBonuslyBet(message) {
+		b, err := bet.ParseComment(message, authUser.Username())
+		if err != nil {
+			return false, InternalServerError.Send(ctx, fmt.Sprintf("invalid Bonusly bet: %s", err.Error()))
+		}
+		if err := b.Insert(); err != nil {
+			return false, InternalServerError.Send(ctx, fmt.Sprintf("inserting Bonusly bet: %s", err.Error()))
+		}
+		// kim: TODO: find BettingPool to add this bet to.
 	}
 	err := comment.Insert()
 	if err != nil {

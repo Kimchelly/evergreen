@@ -141,6 +141,10 @@ func (bp *BettingPool) AddBet(b *bet.Bet) error {
 
 // DecideOutcome determines who is the winner and loser in the betting pool.
 func (bp *BettingPool) DecideOutcome(status string) (*Outcome, error) {
+	// If we have less than two bets in the pool, there will be no winner/loser.
+	if len(bp.BetIDs) < 2 {
+		return &Outcome{}, nil
+	}
 	bets, err := bet.FindAll(bet.ByIDs(bp.BetIDs...))
 	if err != nil {
 		return nil, errors.Wrapf(err, "finding bets")
