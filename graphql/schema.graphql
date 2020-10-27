@@ -1,4 +1,5 @@
 type Query {
+  comments(resourceType: String!, resourceId: String!): [Comment!]!
   userPatches(
     limit: Int = 0
     page: Int = 0
@@ -72,6 +73,12 @@ type Query {
   bbGetCreatedTickets(taskId: String!): [JiraTicket!]!
 }
 type Mutation {
+  addComment(
+    resourceType: String!
+    resourceId: String!
+    message: String!
+    threadId: String
+  ): Boolean!
   addFavoriteProject(identifier: String!): Project!
   removeFavoriteProject(identifier: String!): Project!
   schedulePatch(patchId: String!, reconfigure: PatchReconfigure!): Patch!
@@ -824,6 +831,16 @@ type TicketFields {
 type JiraStatus {
   id: String!
   name: String!
+}
+
+type Comment {
+  id: String!
+  createTime: Time!
+  threadId: String!
+  resourceType: String!
+  resourceId: String!
+  userId: String!
+  message: String!
 }
 
 scalar Time

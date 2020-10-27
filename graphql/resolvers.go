@@ -12,6 +12,7 @@ import (
 	"github.com/evergreen-ci/evergreen/plugin"
 	"github.com/evergreen-ci/evergreen/util"
 	"github.com/mitchellh/mapstructure"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/api"
@@ -19,6 +20,7 @@ import (
 	"github.com/evergreen-ci/evergreen/cloud"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/build"
+	"github.com/evergreen-ci/evergreen/model/comment"
 	"github.com/evergreen-ci/evergreen/model/commitqueue"
 	"github.com/evergreen-ci/evergreen/model/distro"
 	"github.com/evergreen-ci/evergreen/model/event"
@@ -530,6 +532,18 @@ func (r *mutationResolver) UpdateSpawnHostStatus(ctx context.Context, hostID str
 }
 
 type queryResolver struct{ *Resolver }
+
+func (r *queryResolver) Comments(ctx context.Context, resourceType string, resourceID string) ([]*comment.Comment, error) {
+	comments, err := comment.FindByResourceAndType(resourceType, resourceID)
+	if err != nil {
+		return nil, InternalServerError.Send(ctx, fmt.Sprintf("error getting comments: %s", err.Error()))
+	}
+	commentPointers := make([]*comment.Comment, 0, len(comments))
+	for i := range comments {
+		commentPointers = append(commentPointers, &comments[i])
+	}
+	return commentPointers, nil
+}
 
 func (r *queryResolver) Hosts(ctx context.Context, hostID *string, distroID *string, currentTaskID *string, statuses []string, startedBy *string, sortBy *HostSortBy, sortDir *SortDirection, page *int, limit *int) (*HostsResponse, error) {
 	hostIDParam := ""
@@ -1566,6 +1580,30 @@ func (r *taskQueueItemResolver) Requester(ctx context.Context, obj *restModel.AP
 		return TaskQueueItemTypePatch, nil
 	}
 	return TaskQueueItemTypeCommit, nil
+}
+
+func (r *mutationResolver) AddComment(ctx context.Context, resourceType string, resourceID string, message string, threadID *string) (bool, error) {
+	var thread string
+	if threadID != nil {
+		thread = *threadID
+	} else {
+		thread = primitive.NewObjectID().String()
+	}
+	authUser := gimlet.GetUser(ctx)
+	comment := comment.Comment{
+		Id:           thread,
+		CreateTime:   time.Now(),
+		ResourceType: resourceType,
+		ResourceId:   resourceID,
+		Message:      message,
+		ThreadId:     thread,
+		UserId:       authUser.Username(),
+	}
+	err := comment.Insert()
+	if err != nil {
+		return false, InternalServerError.Send(ctx, fmt.Sprintf("error inserting comment: %s", err.Error()))
+	}
+	return true, nil
 }
 
 func (r *mutationResolver) SetTaskPriority(ctx context.Context, taskID string, priority int) (*restModel.APITask, error) {

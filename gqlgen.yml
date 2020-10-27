@@ -138,3 +138,5 @@ models:
     model: github.com/evergreen-ci/evergreen/rest/model.APICloudProviders
   AWSConfig:
     model: github.com/evergreen-ci/evergreen/rest/model.APIAWSConfig
+  Comment:
+    model: github.com/evergreen-ci/evergreen/model/comment.Comment

@@ -14,6 +14,7 @@ import (
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
 	"github.com/evergreen-ci/evergreen/apimodels"
+	"github.com/evergreen-ci/evergreen/model/comment"
 	"github.com/evergreen-ci/evergreen/model/host"
 	"github.com/evergreen-ci/evergreen/rest/model"
 	"github.com/evergreen-ci/evergreen/thirdparty"
@@ -89,6 +90,16 @@ type ComplexityRoot struct {
 
 	CloudProviderConfig struct {
 		AWS func(childComplexity int) int
+	}
+
+	Comment struct {
+		CreateTime   func(childComplexity int) int
+		Id           func(childComplexity int) int
+		Message      func(childComplexity int) int
+		ResourceId   func(childComplexity int) int
+		ResourceType func(childComplexity int) int
+		ThreadId     func(childComplexity int) int
+		UserId       func(childComplexity int) int
 	}
 
 	CommitQueue struct {
@@ -263,6 +274,7 @@ type ComplexityRoot struct {
 
 	Mutation struct {
 		AbortTask                  func(childComplexity int, taskID string) int
+		AddComment                 func(childComplexity int, resourceType string, resourceID string, message string, threadID *string) int
 		AddFavoriteProject         func(childComplexity int, identifier string) int
 		AttachVolumeToHost         func(childComplexity int, volumeAndHost VolumeHost) int
 		BbCreateTicket             func(childComplexity int, taskID string) int
@@ -402,6 +414,7 @@ type ComplexityRoot struct {
 		BbGetCreatedTickets     func(childComplexity int, taskID string) int
 		BuildBaron              func(childComplexity int, taskID string, execution int) int
 		ClientConfig            func(childComplexity int) int
+		Comments                func(childComplexity int, resourceType string, resourceID string) int
 		CommitQueue             func(childComplexity int, id string) int
 		DistroTaskQueue         func(childComplexity int, distroID string) int
 		Distros                 func(childComplexity int, onlySpawnable bool) int
@@ -679,6 +692,7 @@ type HostResolver interface {
 	Volumes(ctx context.Context, obj *model.APIHost) ([]*model.APIVolume, error)
 }
 type MutationResolver interface {
+	AddComment(ctx context.Context, resourceType string, resourceID string, message string, threadID *string) (bool, error)
 	AddFavoriteProject(ctx context.Context, identifier string) (*model.UIProjectFields, error)
 	RemoveFavoriteProject(ctx context.Context, identifier string) (*model.UIProjectFields, error)
 	SchedulePatch(ctx context.Context, patchID string, reconfigure PatchReconfigure) (*model.APIPatch, error)
@@ -723,6 +737,7 @@ type PatchResolver interface {
 	BaseTaskStatuses(ctx context.Context, obj *model.APIPatch) ([]string, error)
 }
 type QueryResolver interface {
+	Comments(ctx context.Context, resourceType string, resourceID string) ([]*comment.Comment, error)
 	UserPatches(ctx context.Context, limit *int, page *int, patchName *string, statuses []string, userID *string, includeCommitQueue *bool) (*UserPatches, error)
 	Task(ctx context.Context, taskID string, execution *int) (*model.APITask, error)
 	TaskAllExecutions(ctx context.Context, taskID string) ([]*model.APITask, error)
@@ -926,6 +941,55 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CloudProviderConfig.AWS(childComplexity), true
+
+	case "Comment.createTime":
+		if e.complexity.Comment.CreateTime == nil {
+			break
+		}
+
+		return e.complexity.Comment.CreateTime(childComplexity), true
+
+	case "Comment.id":
+		if e.complexity.Comment.Id == nil {
+			break
+		}
+
+		return e.complexity.Comment.Id(childComplexity), true
+
+	case "Comment.message":
+		if e.complexity.Comment.Message == nil {
+			break
+		}
+
+		return e.complexity.Comment.Message(childComplexity), true
+
+	case "Comment.resourceId":
+		if e.complexity.Comment.ResourceId == nil {
+			break
+		}
+
+		return e.complexity.Comment.ResourceId(childComplexity), true
+
+	case "Comment.resourceType":
+		if e.complexity.Comment.ResourceType == nil {
+			break
+		}
+
+		return e.complexity.Comment.ResourceType(childComplexity), true
+
+	case "Comment.threadId":
+		if e.complexity.Comment.ThreadId == nil {
+			break
+		}
+
+		return e.complexity.Comment.ThreadId(childComplexity), true
+
+	case "Comment.userId":
+		if e.complexity.Comment.UserId == nil {
+			break
+		}
+
+		return e.complexity.Comment.UserId(childComplexity), true
 
 	case "CommitQueue.message":
 		if e.complexity.CommitQueue.Message == nil {
@@ -1666,6 +1730,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.AbortTask(childComplexity, args["taskId"].(string)), true
+
+	case "Mutation.addComment":
+		if e.complexity.Mutation.AddComment == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_addComment_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.AddComment(childComplexity, args["resourceType"].(string), args["resourceId"].(string), args["message"].(string), args["threadId"].(*string)), true
 
 	case "Mutation.addFavoriteProject":
 		if e.complexity.Mutation.AddFavoriteProject == nil {
@@ -2479,6 +2555,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.ClientConfig(childComplexity), true
+
+	case "Query.comments":
+		if e.complexity.Query.Comments == nil {
+			break
+		}
+
+		args, err := ec.field_Query_comments_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Comments(childComplexity, args["resourceType"].(string), args["resourceId"].(string)), true
 
 	case "Query.commitQueue":
 		if e.complexity.Query.CommitQueue == nil {
@@ -3955,6 +4043,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 
 var sources = []*ast.Source{
 	&ast.Source{Name: "graphql/schema.graphql", Input: `type Query {
+  comments(resourceType: String!, resourceId: String!): [Comment!]!
   userPatches(
     limit: Int = 0
     page: Int = 0
@@ -4028,6 +4117,12 @@ var sources = []*ast.Source{
   bbGetCreatedTickets(taskId: String!): [JiraTicket!]!
 }
 type Mutation {
+  addComment(
+    resourceType: String!
+    resourceId: String!
+    message: String!
+    threadId: String
+  ): Boolean!
   addFavoriteProject(identifier: String!): Project!
   removeFavoriteProject(identifier: String!): Project!
   schedulePatch(patchId: String!, reconfigure: PatchReconfigure!): Patch!
@@ -4782,6 +4877,16 @@ type JiraStatus {
   name: String!
 }
 
+type Comment {
+  id: String!
+  createTime: Time!
+  threadId: String!
+  resourceType: String!
+  resourceId: String!
+  userId: String!
+  message: String!
+}
+
 scalar Time
 scalar Duration
 scalar StringMap
@@ -4804,6 +4909,44 @@ func (ec *executionContext) field_Mutation_abortTask_args(ctx context.Context, r
 		}
 	}
 	args["taskId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_addComment_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["resourceType"]; ok {
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["resourceType"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["resourceId"]; ok {
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["resourceId"] = arg1
+	var arg2 string
+	if tmp, ok := rawArgs["message"]; ok {
+		arg2, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["message"] = arg2
+	var arg3 *string
+	if tmp, ok := rawArgs["threadId"]; ok {
+		arg3, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["threadId"] = arg3
 	return args, nil
 }
 
@@ -5348,6 +5491,28 @@ func (ec *executionContext) field_Query_buildBaron_args(ctx context.Context, raw
 		}
 	}
 	args["execution"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_comments_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["resourceType"]; ok {
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["resourceType"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["resourceId"]; ok {
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["resourceId"] = arg1
 	return args, nil
 }
 
@@ -6421,6 +6586,244 @@ func (ec *executionContext) _CloudProviderConfig_aws(ctx context.Context, field 
 	res := resTmp.(*model.APIAWSConfig)
 	fc.Result = res
 	return ec.marshalOAWSConfig2ᚖgithubᚗcomᚋevergreenᚑciᚋevergreenᚋrestᚋmodelᚐAPIAWSConfig(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Comment_id(ctx context.Context, field graphql.CollectedField, obj *comment.Comment) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:   "Comment",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Id, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Comment_createTime(ctx context.Context, field graphql.CollectedField, obj *comment.Comment) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:   "Comment",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreateTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(time.Time)
+	fc.Result = res
+	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Comment_threadId(ctx context.Context, field graphql.CollectedField, obj *comment.Comment) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:   "Comment",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ThreadId, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Comment_resourceType(ctx context.Context, field graphql.CollectedField, obj *comment.Comment) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:   "Comment",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ResourceType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Comment_resourceId(ctx context.Context, field graphql.CollectedField, obj *comment.Comment) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:   "Comment",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ResourceId, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Comment_userId(ctx context.Context, field graphql.CollectedField, obj *comment.Comment) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:   "Comment",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UserId, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Comment_message(ctx context.Context, field graphql.CollectedField, obj *comment.Comment) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:   "Comment",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _CommitQueue_projectId(ctx context.Context, field graphql.CollectedField, obj *model.APICommitQueue) (ret graphql.Marshaler) {
@@ -9818,6 +10221,47 @@ func (ec *executionContext) _ModuleCodeChange_fileDiffs(ctx context.Context, fie
 	return ec.marshalNFileDiff2ᚕgithubᚗcomᚋevergreenᚑciᚋevergreenᚋrestᚋmodelᚐFileDiffᚄ(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_addComment(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:   "Mutation",
+		Field:    field,
+		Args:     nil,
+		IsMethod: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_addComment_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().AddComment(rctx, args["resourceType"].(string), args["resourceId"].(string), args["message"].(string), args["threadId"].(*string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Mutation_addFavoriteProject(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -13045,6 +13489,47 @@ func (ec *executionContext) _PublicKey_key(ctx context.Context, field graphql.Co
 	res := resTmp.(*string)
 	fc.Result = res
 	return ec.marshalNString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_comments(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:   "Query",
+		Field:    field,
+		Args:     nil,
+		IsMethod: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_comments_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().Comments(rctx, args["resourceType"].(string), args["resourceId"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*comment.Comment)
+	fc.Result = res
+	return ec.marshalNComment2ᚕᚖgithubᚗcomᚋevergreenᚑciᚋevergreenᚋmodelᚋcommentᚐCommentᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_userPatches(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -21506,6 +21991,63 @@ func (ec *executionContext) _CloudProviderConfig(ctx context.Context, sel ast.Se
 	return out
 }
 
+var commentImplementors = []string{"Comment"}
+
+func (ec *executionContext) _Comment(ctx context.Context, sel ast.SelectionSet, obj *comment.Comment) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, commentImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Comment")
+		case "id":
+			out.Values[i] = ec._Comment_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "createTime":
+			out.Values[i] = ec._Comment_createTime(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "threadId":
+			out.Values[i] = ec._Comment_threadId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "resourceType":
+			out.Values[i] = ec._Comment_resourceType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "resourceId":
+			out.Values[i] = ec._Comment_resourceId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "userId":
+			out.Values[i] = ec._Comment_userId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "message":
+			out.Values[i] = ec._Comment_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var commitQueueImplementors = []string{"CommitQueue"}
 
 func (ec *executionContext) _CommitQueue(ctx context.Context, sel ast.SelectionSet, obj *model.APICommitQueue) graphql.Marshaler {
@@ -22420,6 +22962,11 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Mutation")
+		case "addComment":
+			out.Values[i] = ec._Mutation_addComment(ctx, field)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		case "addFavoriteProject":
 			out.Values[i] = ec._Mutation_addFavoriteProject(ctx, field)
 			if out.Values[i] == graphql.Null {
@@ -23215,6 +23762,20 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Query")
+		case "comments":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_comments(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
 		case "userPatches":
 			field := field
 			out.Concurrently(i, func() (res graphql.Marshaler) {
@@ -25295,6 +25856,57 @@ func (ec *executionContext) marshalNBuildBaron2ᚖgithubᚗcomᚋevergreenᚑci�
 
 func (ec *executionContext) marshalNClientBinary2githubᚗcomᚋevergreenᚑciᚋevergreenᚋrestᚋmodelᚐAPIClientBinary(ctx context.Context, sel ast.SelectionSet, v model.APIClientBinary) graphql.Marshaler {
 	return ec._ClientBinary(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNComment2githubᚗcomᚋevergreenᚑciᚋevergreenᚋmodelᚋcommentᚐComment(ctx context.Context, sel ast.SelectionSet, v comment.Comment) graphql.Marshaler {
+	return ec._Comment(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNComment2ᚕᚖgithubᚗcomᚋevergreenᚑciᚋevergreenᚋmodelᚋcommentᚐCommentᚄ(ctx context.Context, sel ast.SelectionSet, v []*comment.Comment) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNComment2ᚖgithubᚗcomᚋevergreenᚑciᚋevergreenᚋmodelᚋcommentᚐComment(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+	return ret
+}
+
+func (ec *executionContext) marshalNComment2ᚖgithubᚗcomᚋevergreenᚑciᚋevergreenᚋmodelᚋcommentᚐComment(ctx context.Context, sel ast.SelectionSet, v *comment.Comment) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._Comment(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNCommitQueue2githubᚗcomᚋevergreenᚑciᚋevergreenᚋrestᚋmodelᚐAPICommitQueue(ctx context.Context, sel ast.SelectionSet, v model.APICommitQueue) graphql.Marshaler {
