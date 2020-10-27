@@ -20,6 +20,7 @@ import (
 	"github.com/evergreen-ci/evergreen/cloud"
 	"github.com/evergreen-ci/evergreen/model"
 	"github.com/evergreen-ci/evergreen/model/bonusly/bet"
+	"github.com/evergreen-ci/evergreen/model/bonusly/pool"
 	"github.com/evergreen-ci/evergreen/model/build"
 	"github.com/evergreen-ci/evergreen/model/comment"
 	"github.com/evergreen-ci/evergreen/model/commitqueue"
@@ -1585,10 +1586,12 @@ func (r *taskQueueItemResolver) Requester(ctx context.Context, obj *restModel.AP
 
 func (r *mutationResolver) AddComment(ctx context.Context, resourceType string, resourceID string, message string, threadID *string) (bool, error) {
 	var thread string
+	var newThread bool
 	if threadID != nil {
 		thread = *threadID
 	} else {
 		thread = primitive.NewObjectID().String()
+		newThread = true
 	}
 	authUser := gimlet.GetUser(ctx)
 	comment := comment.Comment{
@@ -1603,12 +1606,40 @@ func (r *mutationResolver) AddComment(ctx context.Context, resourceType string, 
 	if bet.IsBonuslyBet(message) {
 		b, err := bet.ParseComment(message, authUser.Username())
 		if err != nil {
-			return false, InternalServerError.Send(ctx, fmt.Sprintf("invalid Bonusly bet: %s", err.Error()))
+			return false, InputValidationError.Send(ctx, fmt.Sprintf("invalid Bonusly bet: %s", err.Error()))
 		}
 		if err := b.Insert(); err != nil {
 			return false, InternalServerError.Send(ctx, fmt.Sprintf("inserting Bonusly bet: %s", err.Error()))
 		}
-		// kim: TODO: find BettingPool to add this bet to.
+		var bp *pool.BettingPool
+		if !newThread {
+			if bp, err = pool.FindOne(pool.ByID(thread)); err != nil {
+				return false, InternalServerError.Send(ctx, fmt.Sprintf("finding Bonusly betting pool for thread"))
+			}
+			if bp == nil {
+				return false, InternalServerError.Send(ctx, "could not find Bonusly betting pool for thread")
+			}
+		} else {
+			bp = &pool.BettingPool{
+				ID: thread,
+				// kim: TODO: initialize betting pool with minimum bet amount.
+				// MinimumBet:
+			}
+			switch resourceType {
+			case "version":
+				bp.VersionID = resourceID
+			case "task":
+				bp.TaskID = resourceID
+			default:
+				return false, InputValidationError.Send(ctx, fmt.Sprintf("invalid resource type '%s'", resourceType))
+			}
+			if err := bp.Insert(); err != nil {
+				return false, InternalServerError.Send(ctx, "adding new Bonusly betting pool")
+			}
+		}
+		if err := bp.AddBet(b); err != nil {
+			return false, InternalServerError.Send(ctx, "could not add bet to betting pool")
+		}
 	}
 	err := comment.Insert()
 	if err != nil {
