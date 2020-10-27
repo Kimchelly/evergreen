@@ -13,7 +13,6 @@ const (
 
 var (
 	IDKey             = bsonutil.MustHaveTag(Bet{}, "ID")
-	ParentPoolIDKey   = bsonutil.MustHaveTag(Bet{}, "ParentPoolID")
 	UserIDKey         = bsonutil.MustHaveTag(Bet{}, "UserID")
 	ExpectedStatusKey = bsonutil.MustHaveTag(Bet{}, "ExpectedStatus")
 	AmountKey         = bsonutil.MustHaveTag(Bet{}, "Amount")
@@ -27,20 +26,12 @@ func ByID(id string) db.Q {
 	})
 }
 
+// ByIDs returns a query that finds bets matching any of the given IDs.
 func ByIDs(ids ...string) db.Q {
 	return db.Query(bson.M{
 		IDKey: bson.M{"$in": ids},
 	})
 }
-
-// kim: TODO: maybe remove backreference
-// // ByParentPoolID returns a query that finds all bets with the given parent pool
-// // ID.
-// func ByParentPoolID(id string) db.Q {
-//     return db.Query(bson.M{
-//         ParentPoolIDKey: id,
-//     })
-// }
 
 // ByUserID returns a query that finds all bets submitted by the given user.
 func ByUserID(id string) db.Q {

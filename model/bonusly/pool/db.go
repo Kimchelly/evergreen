@@ -59,3 +59,13 @@ func FindAll(query db.Q) ([]BettingPool, error) {
 	}
 	return bps, err
 }
+
+// UpdateOne updates a single betting pool matching the query in the collection.
+func UpdateOne(query db.Q, update interface{}) error {
+	return db.Update(Collection, query, update)
+}
+
+// UpdateAll updates all betting pool in the collection.
+func UpdateAll(query db.Q, update interface{}) (*adb.ChangeInfo, error) {
+	return db.UpdateAll(Collection, query, update)
+}
