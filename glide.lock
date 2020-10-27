@@ -205,3 +205,6 @@ imports:
     version: 14974a1cf6477f616180232977d8ab4791ea8820
   - name: github.com/shirou/w32
     version: bb4de0191aa41b5507caa14b0650cdbddcd9280b
+
+  - name: github.com/kimchelly/go-bonusly
+    version: a6313548063ec8573eaf6453bcc58e05533ed9c5
