@@ -57,6 +57,10 @@ type GithubUser struct {
 	LastKnownAs string `bson:"last_known_as,omitempty" json:"last_known_as,omitempty"`
 }
 
+type BonuslyUser struct {
+	APIKey string `bson:"api_key,omitempty" json:"api_key,omitempty"`
+}
+
 type PubKey struct {
 	Name      string    `bson:"name" json:"name"`
 	Key       string    `bson:"key" json:"key"`
@@ -68,6 +72,7 @@ type UserSettings struct {
 	Region           string                  `json:"region" bson:"region"`
 	GithubUser       GithubUser              `json:"github_user" bson:"github_user,omitempty"`
 	SlackUsername    string                  `bson:"slack_username,omitempty" json:"slack_username,omitempty"`
+	BonuslyUser      BonuslyUser             `bson:"bonusly_user,omitempty" bson:"bonusly_user,omitempty"`
 	Notifications    NotificationPreferences `bson:"notifications,omitempty" json:"notifications,omitempty"`
 	UseSpruceOptions UseSpruceOptions        `json:"use_spruce_options" bson:"use_spruce_options"`
 }

@@ -41,6 +41,7 @@ type APIUserSettings struct {
 	UseSpruceOptions *APIUseSpruceOptions        `json:"use_spruce_options"`
 	GithubUser       *APIGithubUser              `json:"github_user"`
 	SlackUsername    *string                     `json:"slack_username"`
+	BonuslyUser      *APIBonuslyUser             `json:"bonusly_user"`
 	Notifications    *APINotificationPreferences `json:"notifications"`
 	SpruceFeedback   *APIFeedbackSubmission      `json:"spruce_feedback"`
 }
@@ -62,6 +63,11 @@ func (s *APIUserSettings) BuildFromService(h interface{}) error {
 		}
 		s.GithubUser = &APIGithubUser{}
 		err := s.GithubUser.BuildFromService(v.GithubUser)
+		if err != nil {
+			return err
+		}
+		s.BonuslyUser = &APIBonuslyUser{}
+		err = s.BonuslyUser.BuildFromService(v.BonuslyUser)
 		if err != nil {
 			return err
 		}
@@ -134,6 +140,26 @@ func (g *APIGithubUser) ToService() (interface{}, error) {
 	return user.GithubUser{
 		UID:         g.UID,
 		LastKnownAs: FromStringPtr(g.LastKnownAs),
+	}, nil
+}
+
+type APIBonuslyUser struct {
+	APIKey *string `json:"api_key,omitempty"`
+}
+
+func (b *APIBonuslyUser) BuildFromService(h interface{}) error {
+	switch v := h.(type) {
+	case user.BonuslyUser:
+		b.APIKey = ToStringPtr(v.APIKey)
+	default:
+		return errors.Errorf("incorrect type for APIBonuslyUser")
+	}
+	return nil
+}
+
+func (b *APIBonuslyUser) ToService() (interface{}, error) {
+	return user.BonuslyUser{
+		APIKey: FromStringPtr(b.APIKey),
 	}, nil
 }
 
