@@ -293,7 +293,7 @@ type ComplexityRoot struct {
 		SchedulePatch              func(childComplexity int, patchID string, reconfigure PatchReconfigure) int
 		SchedulePatchTasks         func(childComplexity int, patchID string) int
 		ScheduleTask               func(childComplexity int, taskID string) int
-		SetBonuslyAPIKey           func(childComplexity int, apiKey string) int
+		SetBonuslyAccessToken      func(childComplexity int, token string) int
 		SetPatchPriority           func(childComplexity int, patchID string, priority int) int
 		SetTaskPriority            func(childComplexity int, taskID string, priority int) int
 		SpawnHost                  func(childComplexity int, spawnHostInput *SpawnHostInput) int
@@ -423,7 +423,7 @@ type ComplexityRoot struct {
 		HostEvents              func(childComplexity int, hostID string, hostTag *string, limit *int, page *int) int
 		Hosts                   func(childComplexity int, hostID *string, distroID *string, currentTaskID *string, statuses []string, startedBy *string, sortBy *HostSortBy, sortDir *SortDirection, page *int, limit *int) int
 		InstanceTypes           func(childComplexity int) int
-		IsBonuslyAPIKeySet      func(childComplexity int) int
+		IsBonuslyAccessTokenSet func(childComplexity int) int
 		MyHosts                 func(childComplexity int) int
 		MyPublicKeys            func(childComplexity int) int
 		MyVolumes               func(childComplexity int) int
@@ -695,7 +695,7 @@ type HostResolver interface {
 }
 type MutationResolver interface {
 	AddComment(ctx context.Context, resourceType string, resourceID string, message string, threadID *string) (bool, error)
-	SetBonuslyAPIKey(ctx context.Context, apiKey string) (bool, error)
+	SetBonuslyAccessToken(ctx context.Context, token string) (bool, error)
 	AddFavoriteProject(ctx context.Context, identifier string) (*model.UIProjectFields, error)
 	RemoveFavoriteProject(ctx context.Context, identifier string) (*model.UIProjectFields, error)
 	SchedulePatch(ctx context.Context, patchID string, reconfigure PatchReconfigure) (*model.APIPatch, error)
@@ -771,7 +771,7 @@ type QueryResolver interface {
 	TaskQueueDistros(ctx context.Context) ([]*TaskQueueDistro, error)
 	BuildBaron(ctx context.Context, taskID string, execution int) (*BuildBaron, error)
 	BbGetCreatedTickets(ctx context.Context, taskID string) ([]*thirdparty.JiraTicket, error)
-	IsBonuslyAPIKeySet(ctx context.Context) (bool, error)
+	IsBonuslyAccessTokenSet(ctx context.Context) (bool, error)
 }
 type TaskResolver interface {
 	BaseTaskMetadata(ctx context.Context, obj *model.APITask) (*BaseTaskMetadata, error)
@@ -1963,17 +1963,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.ScheduleTask(childComplexity, args["taskId"].(string)), true
 
-	case "Mutation.setBonuslyAPIKey":
-		if e.complexity.Mutation.SetBonuslyAPIKey == nil {
+	case "Mutation.setBonuslyAccessToken":
+		if e.complexity.Mutation.SetBonuslyAccessToken == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_setBonuslyAPIKey_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_setBonuslyAccessToken_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SetBonuslyAPIKey(childComplexity, args["apiKey"].(string)), true
+		return e.complexity.Mutation.SetBonuslyAccessToken(childComplexity, args["token"].(string)), true
 
 	case "Mutation.setPatchPriority":
 		if e.complexity.Mutation.SetPatchPriority == nil {
@@ -2663,12 +2663,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.InstanceTypes(childComplexity), true
 
-	case "Query.isBonuslyAPIKeySet":
-		if e.complexity.Query.IsBonuslyAPIKeySet == nil {
+	case "Query.isBonuslyAccessTokenSet":
+		if e.complexity.Query.IsBonuslyAccessTokenSet == nil {
 			break
 		}
 
-		return e.complexity.Query.IsBonuslyAPIKeySet(childComplexity), true
+		return e.complexity.Query.IsBonuslyAccessTokenSet(childComplexity), true
 
 	case "Query.myHosts":
 		if e.complexity.Query.MyHosts == nil {
@@ -4138,7 +4138,7 @@ var sources = []*ast.Source{
   taskQueueDistros: [TaskQueueDistro!]!
   buildBaron(taskId: String!, execution: Int!): BuildBaron!
   bbGetCreatedTickets(taskId: String!): [JiraTicket!]!
-  isBonuslyAPIKeySet: Boolean!
+  isBonuslyAccessTokenSet: Boolean!
 }
 type Mutation {
   addComment(
@@ -4147,7 +4147,7 @@ type Mutation {
     message: String!
     threadId: String
   ): Boolean!
-  setBonuslyAPIKey(apiKey: String!): Boolean!
+  setBonuslyAccessToken(token: String!): Boolean!
   addFavoriteProject(identifier: String!): Project!
   removeFavoriteProject(identifier: String!): Project!
   schedulePatch(patchId: String!, reconfigure: PatchReconfigure!): Patch!
@@ -5259,17 +5259,17 @@ func (ec *executionContext) field_Mutation_scheduleTask_args(ctx context.Context
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_setBonuslyAPIKey_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_setBonuslyAccessToken_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
 	var arg0 string
-	if tmp, ok := rawArgs["apiKey"]; ok {
+	if tmp, ok := rawArgs["token"]; ok {
 		arg0, err = ec.unmarshalNString2string(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["apiKey"] = arg0
+	args["token"] = arg0
 	return args, nil
 }
 
@@ -10301,7 +10301,7 @@ func (ec *executionContext) _Mutation_addComment(ctx context.Context, field grap
 	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_setBonuslyAPIKey(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Mutation_setBonuslyAccessToken(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -10317,7 +10317,7 @@ func (ec *executionContext) _Mutation_setBonuslyAPIKey(ctx context.Context, fiel
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_setBonuslyAPIKey_args(ctx, rawArgs)
+	args, err := ec.field_Mutation_setBonuslyAccessToken_args(ctx, rawArgs)
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
@@ -10325,7 +10325,7 @@ func (ec *executionContext) _Mutation_setBonuslyAPIKey(ctx context.Context, fiel
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().SetBonuslyAPIKey(rctx, args["apiKey"].(string))
+		return ec.resolvers.Mutation().SetBonuslyAccessToken(rctx, args["token"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -14737,7 +14737,7 @@ func (ec *executionContext) _Query_bbGetCreatedTickets(ctx context.Context, fiel
 	return ec.marshalNJiraTicket2ᚕᚖgithubᚗcomᚋevergreenᚑciᚋevergreenᚋthirdpartyᚐJiraTicketᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Query_isBonuslyAPIKeySet(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Query_isBonuslyAccessTokenSet(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -14754,7 +14754,7 @@ func (ec *executionContext) _Query_isBonuslyAPIKeySet(ctx context.Context, field
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().IsBonuslyAPIKeySet(rctx)
+		return ec.resolvers.Query().IsBonuslyAccessTokenSet(rctx)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -23081,8 +23081,8 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "setBonuslyAPIKey":
-			out.Values[i] = ec._Mutation_setBonuslyAPIKey(ctx, field)
+		case "setBonuslyAccessToken":
+			out.Values[i] = ec._Mutation_setBonuslyAccessToken(ctx, field)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
@@ -24294,7 +24294,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				}
 				return res
 			})
-		case "isBonuslyAPIKeySet":
+		case "isBonuslyAccessTokenSet":
 			field := field
 			out.Concurrently(i, func() (res graphql.Marshaler) {
 				defer func() {
@@ -24302,7 +24302,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_isBonuslyAPIKeySet(ctx, field)
+				res = ec._Query_isBonuslyAccessTokenSet(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&invalids, 1)
 				}
