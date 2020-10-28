@@ -31,6 +31,9 @@ func init() {
 	registry.AddType(ResourceTypeCommitQueue, commitQueueEventDataFactory)
 	registry.AllowSubscription(ResourceTypeCommitQueue, CommitQueueStartTest)
 	registry.AllowSubscription(ResourceTypeCommitQueue, CommitQueueConcludeTest)
+
+	registry.AddType(ResourceTypeBonuslyBet, bonuslyBetEventDataFactory)
+	registry.AllowSubscription(ResourceTypeBonuslyBet, EventBonuslyBetUserMentioned)
 }
 
 // AddType adds an event data factory to the registry with the given resource
