@@ -1591,7 +1591,7 @@ func (r *mutationResolver) AddComment(ctx context.Context, resourceType string, 
 	if threadID != nil {
 		thread = *threadID
 	} else {
-		thread = primitive.NewObjectID().String()
+		thread = primitive.NewObjectID().Hex()
 		newThread = true
 	}
 	authUser := gimlet.GetUser(ctx)
@@ -1599,13 +1599,17 @@ func (r *mutationResolver) AddComment(ctx context.Context, resourceType string, 
 		return false, err
 	}
 	comment := comment.Comment{
-		Id:           thread,
 		CreateTime:   time.Now(),
 		ResourceType: resourceType,
 		ResourceId:   resourceID,
 		Message:      message,
 		ThreadId:     thread,
 		UserId:       authUser.Username(),
+	}
+	if newThread {
+		comment.Id = thread
+	} else {
+		comment.Id = primitive.NewObjectID().Hex()
 	}
 	err := comment.Insert()
 	if err != nil {
