@@ -140,6 +140,13 @@ func (u *DBUser) GetPublicKey(keyname string) (string, error) {
 	return "", errors.Errorf("Unable to find public key '%v' for user '%v'", keyname, u.Username())
 }
 
+func (u *DBUser) AddBonuslyAPIKey(keyValue string) error {
+	return UpdateOne(
+		bson.M{IdKey: u.Id},
+		bson.M{"$set": bson.M{bsonutil.GetDottedKeyName(SettingsKey, BonuslyUserKey, BonuslyAccessTokenKey): keyValue}},
+	)
+}
+
 func (u *DBUser) AddPublicKey(keyName, keyValue string) error {
 	key := PubKey{
 		Name:      keyName,

@@ -50,6 +50,11 @@ var (
 	userSettingsGithubUserKey = bsonutil.MustHaveTag(UserSettings{}, "GithubUser")
 	UseSpruceOptionsKey       = bsonutil.MustHaveTag(UserSettings{}, "UseSpruceOptions")
 	SpruceV1Key               = bsonutil.MustHaveTag(UseSpruceOptions{}, "SpruceV1")
+	BonuslyUserKey            = bsonutil.MustHaveTag(UserSettings{}, "BonuslyUser")
+)
+
+var (
+	BonuslyAccessTokenKey = bsonutil.MustHaveTag(BonuslyUser{}, "AccessToken")
 )
 
 func FindByGithubUID(uid int) (*DBUser, error) {

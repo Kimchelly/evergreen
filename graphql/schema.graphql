@@ -71,6 +71,7 @@ type Query {
   taskQueueDistros: [TaskQueueDistro!]!
   buildBaron(taskId: String!, execution: Int!): BuildBaron!
   bbGetCreatedTickets(taskId: String!): [JiraTicket!]!
+  isBonuslyAPIKeySet: Boolean!
 }
 type Mutation {
   addComment(
@@ -79,6 +80,7 @@ type Mutation {
     message: String!
     threadId: String
   ): Boolean!
+  setBonuslyAPIKey(apiKey: String!): Boolean!
   addFavoriteProject(identifier: String!): Project!
   removeFavoriteProject(identifier: String!): Project!
   schedulePatch(patchId: String!, reconfigure: PatchReconfigure!): Patch!

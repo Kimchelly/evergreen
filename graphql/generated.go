@@ -293,6 +293,7 @@ type ComplexityRoot struct {
 		SchedulePatch              func(childComplexity int, patchID string, reconfigure PatchReconfigure) int
 		SchedulePatchTasks         func(childComplexity int, patchID string) int
 		ScheduleTask               func(childComplexity int, taskID string) int
+		SetBonuslyAPIKey           func(childComplexity int, apiKey string) int
 		SetPatchPriority           func(childComplexity int, patchID string, priority int) int
 		SetTaskPriority            func(childComplexity int, taskID string, priority int) int
 		SpawnHost                  func(childComplexity int, spawnHostInput *SpawnHostInput) int
@@ -422,6 +423,7 @@ type ComplexityRoot struct {
 		HostEvents              func(childComplexity int, hostID string, hostTag *string, limit *int, page *int) int
 		Hosts                   func(childComplexity int, hostID *string, distroID *string, currentTaskID *string, statuses []string, startedBy *string, sortBy *HostSortBy, sortDir *SortDirection, page *int, limit *int) int
 		InstanceTypes           func(childComplexity int) int
+		IsBonuslyAPIKeySet      func(childComplexity int) int
 		MyHosts                 func(childComplexity int) int
 		MyPublicKeys            func(childComplexity int) int
 		MyVolumes               func(childComplexity int) int
@@ -693,6 +695,7 @@ type HostResolver interface {
 }
 type MutationResolver interface {
 	AddComment(ctx context.Context, resourceType string, resourceID string, message string, threadID *string) (bool, error)
+	SetBonuslyAPIKey(ctx context.Context, apiKey string) (bool, error)
 	AddFavoriteProject(ctx context.Context, identifier string) (*model.UIProjectFields, error)
 	RemoveFavoriteProject(ctx context.Context, identifier string) (*model.UIProjectFields, error)
 	SchedulePatch(ctx context.Context, patchID string, reconfigure PatchReconfigure) (*model.APIPatch, error)
@@ -768,6 +771,7 @@ type QueryResolver interface {
 	TaskQueueDistros(ctx context.Context) ([]*TaskQueueDistro, error)
 	BuildBaron(ctx context.Context, taskID string, execution int) (*BuildBaron, error)
 	BbGetCreatedTickets(ctx context.Context, taskID string) ([]*thirdparty.JiraTicket, error)
+	IsBonuslyAPIKeySet(ctx context.Context) (bool, error)
 }
 type TaskResolver interface {
 	BaseTaskMetadata(ctx context.Context, obj *model.APITask) (*BaseTaskMetadata, error)
@@ -1959,6 +1963,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.ScheduleTask(childComplexity, args["taskId"].(string)), true
 
+	case "Mutation.setBonuslyAPIKey":
+		if e.complexity.Mutation.SetBonuslyAPIKey == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_setBonuslyAPIKey_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.SetBonuslyAPIKey(childComplexity, args["apiKey"].(string)), true
+
 	case "Mutation.setPatchPriority":
 		if e.complexity.Mutation.SetPatchPriority == nil {
 			break
@@ -2646,6 +2662,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.InstanceTypes(childComplexity), true
+
+	case "Query.isBonuslyAPIKeySet":
+		if e.complexity.Query.IsBonuslyAPIKeySet == nil {
+			break
+		}
+
+		return e.complexity.Query.IsBonuslyAPIKeySet(childComplexity), true
 
 	case "Query.myHosts":
 		if e.complexity.Query.MyHosts == nil {
@@ -4115,6 +4138,7 @@ var sources = []*ast.Source{
   taskQueueDistros: [TaskQueueDistro!]!
   buildBaron(taskId: String!, execution: Int!): BuildBaron!
   bbGetCreatedTickets(taskId: String!): [JiraTicket!]!
+  isBonuslyAPIKeySet: Boolean!
 }
 type Mutation {
   addComment(
@@ -4123,6 +4147,7 @@ type Mutation {
     message: String!
     threadId: String
   ): Boolean!
+  setBonuslyAPIKey(apiKey: String!): Boolean!
   addFavoriteProject(identifier: String!): Project!
   removeFavoriteProject(identifier: String!): Project!
   schedulePatch(patchId: String!, reconfigure: PatchReconfigure!): Patch!
@@ -5231,6 +5256,20 @@ func (ec *executionContext) field_Mutation_scheduleTask_args(ctx context.Context
 		}
 	}
 	args["taskId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_setBonuslyAPIKey_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["apiKey"]; ok {
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["apiKey"] = arg0
 	return args, nil
 }
 
@@ -10262,6 +10301,47 @@ func (ec *executionContext) _Mutation_addComment(ctx context.Context, field grap
 	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Mutation_setBonuslyAPIKey(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:   "Mutation",
+		Field:    field,
+		Args:     nil,
+		IsMethod: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Mutation_setBonuslyAPIKey_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().SetBonuslyAPIKey(rctx, args["apiKey"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Mutation_addFavoriteProject(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -14655,6 +14735,40 @@ func (ec *executionContext) _Query_bbGetCreatedTickets(ctx context.Context, fiel
 	res := resTmp.([]*thirdparty.JiraTicket)
 	fc.Result = res
 	return ec.marshalNJiraTicket2ᚕᚖgithubᚗcomᚋevergreenᚑciᚋevergreenᚋthirdpartyᚐJiraTicketᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_isBonuslyAPIKeySet(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:   "Query",
+		Field:    field,
+		Args:     nil,
+		IsMethod: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().IsBonuslyAPIKeySet(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -22967,6 +23081,11 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "setBonuslyAPIKey":
+			out.Values[i] = ec._Mutation_setBonuslyAPIKey(ctx, field)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		case "addFavoriteProject":
 			out.Values[i] = ec._Mutation_addFavoriteProject(ctx, field)
 			if out.Values[i] == graphql.Null {
@@ -24170,6 +24289,20 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_bbGetCreatedTickets(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
+		case "isBonuslyAPIKeySet":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_isBonuslyAPIKeySet(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&invalids, 1)
 				}

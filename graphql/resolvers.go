@@ -2223,6 +2223,23 @@ func (r *mutationResolver) UpdatePublicKey(ctx context.Context, targetKeyName st
 	return myPublicKeys, nil
 }
 
+func (r *queryResolver) IsBonuslyAPIKeySet(ctx context.Context) (bool, error) {
+	usr := MustHaveUser(ctx)
+	if usr.Settings.BonuslyUser.AccessToken == "" {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (r *mutationResolver) SetBonuslyAPIKey(ctx context.Context, apiKey string) (bool, error) {
+	usr := MustHaveUser(ctx)
+	err := usr.AddBonuslyAPIKey(apiKey)
+	if err != nil {
+		return false, InternalServerError.Send(ctx, fmt.Sprintf("error setting bonusly token: %s", err.Error()))
+	}
+	return true, nil
+}
+
 func (r *queryResolver) User(ctx context.Context, userIdParam *string) (*restModel.APIDBUser, error) {
 	usr := MustHaveUser(ctx)
 	var err error
