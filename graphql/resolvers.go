@@ -1585,7 +1585,7 @@ func (r *taskQueueItemResolver) Requester(ctx context.Context, obj *restModel.AP
 	return TaskQueueItemTypeCommit, nil
 }
 
-func (r *mutationResolver) AddComment(ctx context.Context, resourceType string, resourceID string, message string, threadID *string) (bool, error) {
+func (r *mutationResolver) AddComment(ctx context.Context, resourceType string, resourceID string, text string, threadID *string) (bool, error) {
 	var thread string
 	var newThread bool
 	if threadID != nil {
@@ -1595,14 +1595,22 @@ func (r *mutationResolver) AddComment(ctx context.Context, resourceType string, 
 		newThread = true
 	}
 	authUser := gimlet.GetUser(ctx)
-	if err := handleBonuslyBetComment(ctx, message, resourceType, resourceID, authUser.Username(), thread, newThread); err != nil {
+	bonuslyParams := bonuslyBetParameters{
+		comment:      text,
+		resourceType: resourceType,
+		resourceID:   resourceID,
+		userID:       authUser.Username(),
+		threadID:     thread,
+		newThread:    newThread,
+	}
+	if err := handleBonuslyBetComment(ctx, bonuslyParams); err != nil {
 		return false, err
 	}
 	comment := comment.Comment{
 		CreateTime:   time.Now(),
 		ResourceType: resourceType,
 		ResourceId:   resourceID,
-		Message:      message,
+		Message:      text,
 		ThreadId:     thread,
 		UserId:       authUser.Username(),
 	}
@@ -1618,85 +1626,195 @@ func (r *mutationResolver) AddComment(ctx context.Context, resourceType string, 
 	return true, nil
 }
 
-func handleBonuslyBetComment(ctx context.Context, resourceType, resourceID, comment, userID, threadID string, newThread bool) error {
-	if !bonusly.IsBonuslyBet(comment) {
+type bonuslyBetParameters struct {
+	comment      string
+	resourceType string
+	resourceID   string
+	userID       string
+	threadID     string
+	newThread    bool
+}
+
+func handleBonuslyBetComment(ctx context.Context, params bonuslyBetParameters) error {
+	if !bonusly.IsBonuslyBet(params.comment) {
 		return nil
 	}
-	var bp *betpool.BettingPool
-	var b bet.Bet
-	var pb *bonusly.ParsedBet
+	// kim: TODO: remove
+	// grip.Info(message.Fields{
+	//     "message":       "kim: handling bonusly bet comment",
+	//     "resource_id":   params.resourceID,
+	//     "resource_type": params.resourceType,
+	//     "user":          params.userID,
+	//     "thread":        params.threadID,
+	//     "betting_pool":  params.newThread,
+	//     "comment":       params.comment,
+	// })
+
 	var userMentions []string
 
-	if newThread {
-		pbp, err := bonusly.ParseBettingPoolComment(comment, userID)
+	if params.newThread {
+		pbp, err := bonusly.ParseBettingPoolComment(params.comment, params.userID)
 		if err != nil {
-			return InputValidationError.Send(ctx, fmt.Sprintf("invalid Bonusly bet to start betting pool: %s", err.Error()))
+			return InputValidationError.Send(ctx, fmt.Sprintf("invalid Bonusly bet comment: %s", err.Error()))
 		}
-		b = pbp.Bet
-		pb = &pbp.ParsedBet
 		userMentions = pbp.UserMentions
-		bp := &betpool.BettingPool{
-			ID:         threadID,
+		bp := betpool.BettingPool{
+			ID:         params.threadID,
 			MinimumBet: pbp.MinimumBet,
+			BetIDs:     []string{pbp.Bet.ID},
 		}
-		switch resourceType {
+		// kim: TODO: remove
+		// grip.Info(message.Fields{
+		//     "message":      "kim: parsed new bonusly betting pool",
+		//     "bet":          fmt.Sprintf("%#v", pbp.Bet),
+		//     "betting_pool": fmt.Sprintf("%#v", bp),
+		// })
+
+		switch params.resourceType {
 		case "task":
-			t, err := task.FindOne(task.ById(resourceID))
+			t, err := task.FindOne(task.ById(params.resourceID))
 			if err != nil {
-				return InternalServerError.Send(ctx, fmt.Sprintf("finding task '%s': %s", resourceID, err.Error()))
+				// kim: TODO: remove
+				// grip.Error(message.WrapError(err, message.Fields{
+				//     "message":      "kim: could not find task",
+				//     "bet":          fmt.Sprintf("%#v", pbp.Bet),
+				//     "betting_pool": fmt.Sprintf("%#v", bp),
+				//     "task_id":      params.resourceID,
+				// }))
+				return InternalServerError.Send(ctx, fmt.Sprintf("finding task '%s': %s", params.resourceID, err.Error()))
 			}
 			if t == nil {
-				return InternalServerError.Send(ctx, fmt.Sprintf("could not find task '%s'", resourceID))
+				// kim: TODO: remove
+				// grip.Error(message.Fields{
+				//     "message":      "kim: task does not exist",
+				//     "bet":          fmt.Sprintf("%#v", pbp.Bet),
+				//     "betting_pool": fmt.Sprintf("%#v", bp),
+				//     "task_id":      params.resourceID,
+				// })
+				return InternalServerError.Send(ctx, fmt.Sprintf("could not find task '%s'", params.resourceID))
 			}
 			if err := bet.ValidateBetSubmissionStatusForTask(t.Status); err != nil {
-				return InternalServerError.Send(ctx, fmt.Sprintf("invalid task status '%s' for submitting bet: %s", resourceID, err.Error()))
+				return InternalServerError.Send(ctx, fmt.Sprintf("invalid task status '%s' for submitting bet: %s", params.resourceID, err.Error()))
 			}
-			bp.TaskID = resourceID
+			bp.TaskID = params.resourceID
 		case "version":
-			v, err := model.VersionFindOneId(resourceID)
+			v, err := model.VersionFindOneId(params.resourceID)
 			if err != nil {
-				return InternalServerError.Send(ctx, fmt.Sprintf("finding version '%s': %s", resourceID, err.Error()))
+				// kim: TODO: remove
+				// grip.Error(message.WrapError(err, message.Fields{
+				//     "message":      "kim: could not find patch",
+				//     "bet":          fmt.Sprintf("%#v", pbp.Bet),
+				//     "betting_pool": fmt.Sprintf("%#v", bp),
+				//     "version_id":   params.resourceID,
+				// }))
+				return InternalServerError.Send(ctx, fmt.Sprintf("finding version '%s': %s", params.resourceID, err.Error()))
 			}
 			if v == nil {
-				return InternalServerError.Send(ctx, fmt.Sprintf("could not find version '%s'", resourceID))
+				// kim: TODO: remove
+				// grip.Error(message.Fields{
+				//     "message":      "kim: version does not exist",
+				//     "bet":          fmt.Sprintf("%#v", pbp.Bet),
+				//     "betting_pool": fmt.Sprintf("%#v", bp),
+				// })
+				return InternalServerError.Send(ctx, fmt.Sprintf("could not find version '%s'", params.resourceID))
 			}
 			if err := bet.ValidateBetSubmissionStatusForVersion(v.Status); err != nil {
-				return InternalServerError.Send(ctx, fmt.Sprintf("invalid version status '%s' for submitting bet: %s", resourceID, err.Error()))
+				return InternalServerError.Send(ctx, fmt.Sprintf("invalid version status '%s' for submitting bet: %s", params.resourceID, err.Error()))
 			}
-			bp.VersionID = resourceID
+			bp.VersionID = params.resourceID
 		default:
-			return InputValidationError.Send(ctx, fmt.Sprintf("invalid resource type %s", resourceType))
+			return InputValidationError.Send(ctx, fmt.Sprintf("invalid resource type %s", params.resourceType))
+		}
+
+		if err := pbp.Bet.Validate(); err != nil {
+			// kim: TODO: remove
+			// grip.Error(message.WrapError(err, message.Fields{
+			//     "message":      "kim: invalid bet",
+			//     "bet":          fmt.Sprintf("%#v", pbp.Bet),
+			//     "betting_pool": fmt.Sprintf("%#v", bp),
+			// }))
+			return InternalServerError.Send(ctx, fmt.Sprintf("validating new Bonusly bet: %s", err.Error()))
+		}
+		if err := pbp.Bet.Insert(); err != nil {
+			return InternalServerError.Send(ctx, fmt.Sprintf("inserting new Bonusly bet: %s", err.Error()))
+		}
+		if err := bp.Validate(); err != nil {
+			// kim: TODO: remove
+			// grip.Error(message.WrapError(err, message.Fields{
+			//     "message":      "kim: invalid betting pool",
+			//     "bet":          fmt.Sprintf("%#v", pbp.Bet),
+			//     "betting_pool": fmt.Sprintf("%#v", bp),
+			// }))
+			return InternalServerError.Send(ctx, fmt.Sprintf("validating new Bonusly betting pool: %s", err.Error()))
 		}
 		if err := bp.Insert(); err != nil {
 			return InternalServerError.Send(ctx, "adding new Bonusly betting pool")
 		}
-	} else {
-		var err error
-		pb, err = bonusly.ParseBetComment(comment, userID)
-		if err != nil {
-			return InputValidationError.Send(ctx, fmt.Sprintf("invalid Bonusly bet: %s", err.Error()))
+		for _, mentionedUser := range userMentions {
+			event.LogBonuslyBetUserMentioned(bp.ID, params.userID, mentionedUser)
 		}
-		b = pb.Bet
+	} else {
+		pb, err := bonusly.ParseBetComment(params.comment, params.userID)
+		if err != nil {
+			return InputValidationError.Send(ctx, fmt.Sprintf("invalid Bonusly bet comment: %s", err.Error()))
+		}
 		userMentions = pb.UserMentions
-		if bp, err = betpool.FindOne(betpool.ByID(threadID)); err != nil {
+		bp, err := betpool.FindOne(betpool.ByID(params.threadID))
+		if err != nil {
 			return InternalServerError.Send(ctx, fmt.Sprintf("finding Bonusly betting pool for thread: %s", err.Error()))
 		}
 		if bp == nil {
 			return InternalServerError.Send(ctx, "could not find Bonusly betting pool for thread")
 		}
-	}
-	if err := b.Validate(); err != nil {
-		return InternalServerError.Send(ctx, fmt.Sprintf("validating new Bonusly bet: %s", err.Error()))
-	}
-	if err := b.Insert(); err != nil {
-		return InternalServerError.Send(ctx, fmt.Sprintf("inserting new Bonusly bet: %s", err.Error()))
-	}
-	if err := bp.AddBet(b); err != nil {
-		return InternalServerError.Send(ctx, "could not add bet to betting pool")
-	}
+		// kim: TODO: remove
+		// grip.Info(message.Fields{
+		//     "message":      "kim: parsed bonusly bet on existing betting pool",
+		//     "bet":          fmt.Sprintf("%#v", pb.Bet),
+		//     "betting_pool": fmt.Sprintf("%#v", *bp),
+		// })
+		if bp.TaskID != "" {
+			t, err := task.FindOne(task.ById(bp.TaskID))
+			if err != nil {
+				return InternalServerError.Send(ctx, fmt.Sprintf("finding task '%s': %s", bp.TaskID, err.Error()))
+			}
+			if t == nil {
+				return InternalServerError.Send(ctx, fmt.Sprintf("could not find task '%s'", bp.TaskID))
+			}
+			if err := bet.ValidateBetSubmissionStatusForTask(t.Status); err != nil {
+				return InternalServerError.Send(ctx, fmt.Sprintf("invalid task status '%s' for submitting bet: %s", bp.TaskID, err.Error()))
+			}
+		}
+		if bp.VersionID != "" {
+			v, err := model.VersionFindOneId(bp.VersionID)
+			if err != nil {
+				return InternalServerError.Send(ctx, fmt.Sprintf("finding version '%s': %s", bp.VersionID, err.Error()))
+			}
+			if v == nil {
+				return InternalServerError.Send(ctx, fmt.Sprintf("could not find version '%s'", bp.VersionID))
+			}
+			if err := bet.ValidateBetSubmissionStatusForVersion(v.Status); err != nil {
+				return InternalServerError.Send(ctx, fmt.Sprintf("invalid version status '%s' for submitting bet: %s", bp.VersionID, err.Error()))
+			}
+		}
 
-	for _, mentionedUser := range userMentions {
-		event.LogBonuslyBetUserMentioned(bp.ID, userID, mentionedUser)
+		if err := pb.Bet.Validate(); err != nil {
+			// kim: TODO: remove
+			// grip.Error(message.WrapError(err, message.Fields{
+			//     "message":      "kim: invalid bet",
+			//     "bet":          fmt.Sprintf("%#v", pb.Bet),
+			//     "betting_pool": fmt.Sprintf("%#v", *bp),
+			// }))
+			return InternalServerError.Send(ctx, fmt.Sprintf("validating new Bonusly bet: %s", err.Error()))
+		}
+		if err := pb.Bet.Insert(); err != nil {
+			return InternalServerError.Send(ctx, fmt.Sprintf("inserting new Bonusly bet: %s", err.Error()))
+		}
+		if err := bp.AddBet(pb.Bet); err != nil {
+			return InternalServerError.Send(ctx, "could not add bet to betting pool")
+		}
+		for _, mentionedUser := range userMentions {
+			event.LogBonuslyBetUserMentioned(bp.ID, params.userID, mentionedUser)
+		}
 	}
 
 	return nil

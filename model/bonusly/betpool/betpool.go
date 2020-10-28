@@ -124,6 +124,20 @@ func (bp *BettingPool) AddBet(b bet.Bet) error {
 	if err := bp.ValidateBet(b); err != nil {
 		return errors.Wrap(err, "invalid bet")
 	}
+	if utility.StringSliceContains(bp.BetIDs, b.ID) {
+		return errors.Errorf("cannot add bet '%s' because it already exists in the betting pool", b.ID)
+	}
+
+	bets, err := bet.FindAll(bet.ByIDs(bp.BetIDs...))
+	if err != nil {
+		return errors.Wrapf(err, "finding bets")
+	}
+	for _, existing := range bets {
+		if existing.UserID == b.UserID {
+			return errors.Errorf("user '%s' cannot submit bet because they have already placed a bet on this betting pool", b.UserID)
+		}
+	}
+
 	if err := b.Insert(); err != nil {
 		return errors.WithStack(err)
 	}
@@ -200,7 +214,7 @@ func (o *Outcome) distributeBet(loser bet.Bet) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	c, err := bonusly.NewClient(bonusly.ClientOptions{
-		AccessToken: u.Bonusly.AccessToken,
+		AccessToken: u.Settings.BonuslyUser.AccessToken,
 	})
 	if err != nil {
 		return errors.Wrapf(err, "creating Bonusly client for user '%s'", loser.UserID)

@@ -1,8 +1,12 @@
 package trigger
 
 import (
+	"bytes"
+	"fmt"
+	"text/template"
+
 	"github.com/evergreen-ci/evergreen"
-	"github.com/evergreen-ci/evergreen/model/bonusly/bet"
+	"github.com/evergreen-ci/evergreen/model/bonusly/betpool"
 	"github.com/evergreen-ci/evergreen/model/event"
 	"github.com/evergreen-ci/evergreen/model/notification"
 	"github.com/mongodb/grip/message"
@@ -10,7 +14,9 @@ import (
 )
 
 const (
-// kim: Notification templates
+	// kim: Notification templates
+	bonuslyBetMentionSlackBody            = `You have been invited by {{.User}} to a Bonusly bet! Visit <{{.URL}}|this link> to place a bet.`
+	bonuslyBetMentionSlackAttachmentTitle = "Bonusly Bet"
 )
 
 func init() {
@@ -22,14 +28,12 @@ type bonuslyBetTriggers struct {
 
 	event        *event.EventLogEntry
 	data         *event.BonuslyBetEventData
-	bet          *bet.Bet
+	bp           *betpool.BettingPool
 	uiConfig     evergreen.UIConfig
 	templateData bonuslyBetTemplateData
 }
 
 type bonuslyBetTemplateData struct {
-	taskID         string
-	versionID      string
 	mentioningUser string
 	url            string
 }
@@ -42,16 +46,28 @@ func (t *bonuslyBetTriggers) Fetch(e *event.EventLogEntry) error {
 		return errors.Errorf("expected Bonusly bet event data, got %T", e.Data)
 	}
 
-	t.bet, err = bet.FindOne(bet.ByID(e.ResourceId))
+	t.bp, err = betpool.FindOne(betpool.ByID(e.ResourceId))
 	if err != nil {
-		return errors.Wrap(err, "fetching Bonusly bet")
+		return errors.Wrap(err, "fetching Bonusly betting pool")
 	}
-	if t.bet == nil {
-		return errors.New("could not find Bonusly bet")
+	if t.bp == nil {
+		return errors.New("could not find Bonusly betting pool")
 	}
 
 	if err = t.uiConfig.Get(evergreen.GetEnvironment()); err != nil {
 		return errors.Wrap(err, "fetching UI config")
+	}
+
+	var url string
+	if t.bp.TaskID != "" {
+		url = fmt.Sprintf("%s/task/%s", t.uiConfig.Url, t.bp.TaskID)
+	}
+	if t.bp.VersionID != "" {
+		url = fmt.Sprintf("%s/version/%s", t.uiConfig.Url, t.bp.VersionID)
+	}
+	t.templateData = bonuslyBetTemplateData{
+		mentioningUser: t.data.User,
+		url:            url,
 	}
 
 	return nil
@@ -65,7 +81,7 @@ func (t *bonuslyBetTriggers) Selectors() []event.Selector {
 	return []event.Selector{
 		{
 			Type: event.SelectorID,
-			Data: t.bet.ID,
+			Data: t.bp.ID,
 		},
 		{
 			Type: event.SelectorObject,
@@ -91,31 +107,48 @@ func (t *bonuslyBetTriggers) userMentioned(sub *event.Subscription) (*notificati
 }
 
 func (t *bonuslyBetTriggers) generate(sub *event.Subscription) (*notification.Notification, error) {
-	payload := t.makePayload(sub)
-	if payload == nil {
-		return nil, errors.Errorf("unsupported subscriber type: %s", sub.Subscriber.Type)
+	payload, err := t.makePayload(sub)
+	if err != nil {
+		return nil, errors.Wrap(err, "creating Bonusly bet payload")
 	}
 
 	return notification.New(t.event.ID, sub.Trigger, &sub.Subscriber, payload)
 }
 
-func (t *bonuslyBetTriggers) makePayload(sub *event.Subscription) interface{} {
+func (t *bonuslyBetTriggers) makePayload(sub *event.Subscription) (interface{}, error) {
 	switch sub.Subscriber.Type {
 	case event.SlackSubscriberType:
 		return t.slack()
 	case event.EmailSubscriberType:
 		return t.email()
 	default:
-		return nil
+		return nil, errors.Errorf("unsupported subscriber type %T", sub.Subscriber.Type)
 	}
 }
 
-func (t *bonuslyBetTriggers) slack() *notification.SlackPayload {
-	// kim: TODO: implement template
-	return nil
+func (t *bonuslyBetTriggers) slack() (*notification.SlackPayload, error) {
+	attachment := message.SlackAttachment{
+		Title:     bonuslyBetMentionSlackAttachmentTitle,
+		TitleLink: t.templateData.url,
+		Color:     evergreenSuccessColor,
+	}
+
+	buf := &bytes.Buffer{}
+	tmpl, err := template.New("subject").Parse(bonuslyBetMentionSlackBody)
+	if err != nil {
+		return nil, errors.Wrap(err, "parsing body template")
+	}
+	if err = tmpl.Execute(buf, t); err != nil {
+		return nil, errors.Wrap(err, "executing body template")
+	}
+
+	return &notification.SlackPayload{
+		Body:        buf.String(),
+		Attachments: []message.SlackAttachment{attachment},
+	}, nil
 }
 
-func (t *bonuslyBetTriggers) email() *message.Email {
+func (t *bonuslyBetTriggers) email() (*message.Email, error) {
 	// kim: TODO: implement template
-	return nil
+	return nil, errors.New("email notifications not supported for Bonusly bet notifications")
 }

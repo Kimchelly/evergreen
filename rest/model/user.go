@@ -144,13 +144,13 @@ func (g *APIGithubUser) ToService() (interface{}, error) {
 }
 
 type APIBonuslyUser struct {
-	APIKey *string `json:"api_key,omitempty"`
+	AccessToken *string `json:"access_token,omitempty"`
 }
 
 func (b *APIBonuslyUser) BuildFromService(h interface{}) error {
 	switch v := h.(type) {
 	case user.BonuslyUser:
-		b.APIKey = ToStringPtr(v.APIKey)
+		b.AccessToken = ToStringPtr(v.AccessToken)
 	default:
 		return errors.Errorf("incorrect type for APIBonuslyUser")
 	}
@@ -159,7 +159,7 @@ func (b *APIBonuslyUser) BuildFromService(h interface{}) error {
 
 func (b *APIBonuslyUser) ToService() (interface{}, error) {
 	return user.BonuslyUser{
-		APIKey: FromStringPtr(b.APIKey),
+		AccessToken: FromStringPtr(b.AccessToken),
 	}, nil
 }
 

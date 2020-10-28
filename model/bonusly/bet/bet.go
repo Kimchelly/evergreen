@@ -48,13 +48,10 @@ func (b *Bet) ValidateUser() error {
 	}
 
 	catcher := grip.NewBasicCatcher()
-	if b.user.Bonusly.UserName == "" {
-		catcher.Errorf("user '%s' cannot submit bets because they have not set their Bonusly user name", b.UserID)
-	}
-	if b.user.Bonusly.AccessToken == "" {
+	if b.user.Settings.BonuslyUser.AccessToken == "" {
 		catcher.Errorf("user '%s' cannot submit bets because they have not set their Bonusly access token", b.UserID)
 	}
-	if b.user.Bonusly.UserName != "" && b.user.Bonusly.AccessToken != "" {
+	if b.user.Settings.BonuslyUser.AccessToken != "" {
 		catcher.Wrap(b.ValidateAmount(), "invalid bet amount")
 	}
 
@@ -94,7 +91,7 @@ func (b *Bet) ValidateAmount() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	c, err := bonusly.NewClient(bonusly.ClientOptions{
-		AccessToken: b.user.Bonusly.AccessToken,
+		AccessToken: b.user.Settings.BonuslyUser.AccessToken,
 	})
 	if err != nil {
 		return errors.Wrap(err, "creating Bonusly client")

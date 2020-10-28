@@ -29,8 +29,8 @@ var (
 )
 
 // IsBonuslyBet returns whether or not the comment message is a Bonusly bet.
-func IsBonuslyBet(message string) bool {
-	return strings.HasPrefix(strings.TrimSpace(message), betCommand)
+func IsBonuslyBet(comment string) bool {
+	return strings.HasPrefix(strings.TrimSpace(comment), betCommand)
 }
 
 // ParsedBettingPool represents the options parsed from a betting pool comment.
@@ -42,39 +42,39 @@ type ParsedBettingPool struct {
 // ParseBettingPoolComment parses a Bonusly bet comment to initialize a betting
 // pool.
 // Valid betting comments take the form: /bet <expected_outcome> [+]amount [+]minBet [@user1, @user2...] [comment]
-func ParseBettingPoolComment(message, userID string) (*ParsedBettingPool, error) {
+func ParseBettingPoolComment(comment, userID string) (*ParsedBettingPool, error) {
 	var err error
-	if message, err = parseBetCommand(message); err != nil {
+	if comment, err = parseBetCommand(comment); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
 	var status string
-	if message, status, err = parseExpectedStatus(message); err != nil {
+	if comment, status, err = parseExpectedStatus(comment); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
 	var amount int
-	if message, amount, err = parseAmount(message); err != nil {
+	if comment, amount, err = parseAmount(comment); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
 	var minBet int
-	message, minBet, _ = parseAmount(message)
+	comment, minBet, _ = parseAmount(comment)
 	if minBet == -1 {
 		minBet = 0
 	}
 
 	var userMentions []string
-	message, userMentions = parseUserMentions(message)
+	comment, userMentions = parseUserMentions(comment)
 
 	return &ParsedBettingPool{
 		ParsedBet: ParsedBet{
 			Bet: bet.Bet{
-				ID:             primitive.NewObjectID().String(),
+				ID:             primitive.NewObjectID().Hex(),
 				UserID:         userID,
 				ExpectedStatus: status,
 				Amount:         amount,
-				Message:        strings.TrimSpace(message),
+				Message:        strings.TrimSpace(comment),
 			},
 
 			UserMentions: userMentions,
@@ -90,45 +90,45 @@ type ParsedBet struct {
 }
 
 // ParseBetComment parses a Bonusly bet comment.
-func ParseBetComment(message, userID string) (*ParsedBet, error) {
+func ParseBetComment(comment, userID string) (*ParsedBet, error) {
 	var err error
-	if message, err = parseBetCommand(message); err != nil {
+	if comment, err = parseBetCommand(comment); err != nil {
 		return nil, errors.WithStack(err)
 	}
 	var status string
-	if message, status, err = parseExpectedStatus(message); err != nil {
+	if comment, status, err = parseExpectedStatus(comment); err != nil {
 		return nil, errors.WithStack(err)
 	}
 	var amount int
-	if message, amount, err = parseAmount(message); err != nil {
+	if comment, amount, err = parseAmount(comment); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
 	var userMentions []string
-	message, userMentions = parseUserMentions(message)
+	comment, userMentions = parseUserMentions(comment)
 
 	return &ParsedBet{
 		Bet: bet.Bet{
-			ID:             primitive.NewObjectID().String(),
+			ID:             primitive.NewObjectID().Hex(),
 			UserID:         userID,
 			ExpectedStatus: status,
 			Amount:         amount,
-			Message:        strings.TrimSpace(message),
+			Message:        strings.TrimSpace(comment),
 		},
 		UserMentions: userMentions,
 	}, nil
 }
 
-func parseBetCommand(message string) (parsed string, err error) {
-	parsed = strings.TrimSpace(message)
+func parseBetCommand(comment string) (parsed string, err error) {
+	parsed = strings.TrimSpace(comment)
 	if !strings.HasPrefix(parsed, betCommand) {
 		return parsed, errors.Errorf("missing Bonusly %s command", betCommand)
 	}
 	return strings.TrimPrefix(parsed, betCommand), nil
 }
 
-func parseExpectedStatus(message string) (parsed string, status string, err error) {
-	parsed = strings.TrimSpace(message)
+func parseExpectedStatus(comment string) (parsed string, status string, err error) {
+	parsed = strings.TrimSpace(comment)
 
 	for _, status := range allowedTaskStatuses {
 		if strings.HasPrefix(parsed, status) {
@@ -142,25 +142,25 @@ func parseExpectedStatus(message string) (parsed string, status string, err erro
 		}
 	}
 
-	return message, "", errors.New("bet does not have a valid expected status to bet on")
+	return comment, "", errors.New("bet does not have a valid expected status to bet on")
 }
 
-func parseAmount(message string) (parsed string, amount int, err error) {
-	parsed = strings.TrimSpace(message)
+func parseAmount(comment string) (parsed string, amount int, err error) {
+	parsed = strings.TrimSpace(comment)
 
 	words := strings.Fields(parsed)
 	if len(words) == 0 {
-		return message, -1, errors.Errorf("could not parse bet amount")
+		return comment, -1, errors.Errorf("could not parse bet amount")
 	}
 	if amount, err = strconv.Atoi(words[0]); err != nil {
-		return message, -1, errors.Wrap(err, "parsing bet as an integer")
+		return comment, -1, errors.Wrap(err, "parsing bet as an integer")
 	}
 
 	return strings.TrimPrefix(parsed, words[0]), amount, nil
 }
 
-func parseUserMentions(message string) (parsed string, mentions []string) {
-	parsed = message
+func parseUserMentions(comment string) (parsed string, mentions []string) {
+	parsed = comment
 
 	parsed = strings.TrimSpace(parsed)
 	words := strings.Fields(parsed)
@@ -175,7 +175,7 @@ func parseUserMentions(message string) (parsed string, mentions []string) {
 	}
 
 	if len(mentions) == 0 {
-		return message, nil
+		return comment, nil
 	}
 
 	return parsed, mentions
