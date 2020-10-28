@@ -150,6 +150,8 @@ type APINotificationPreferences struct {
 	SpawnHostOutcomeID    *string `json:"spawn_host_outcome_id,omitempty"`
 	CommitQueue           *string `json:"commit_queue"`
 	CommitQueueID         *string `json:"commit_queue_id,omitempty"`
+	BonuslyBet            *string `json:"bonusly_bet"`
+	BonuslyBetID          *string `json:"bonusly_bet_id,omitempty"`
 }
 
 func (n *APINotificationPreferences) BuildFromService(h interface{}) error {
@@ -164,6 +166,7 @@ func (n *APINotificationPreferences) BuildFromService(h interface{}) error {
 		n.SpawnHostOutcome = ToStringPtr(string(v.SpawnHostOutcome))
 		n.SpawnHostExpiration = ToStringPtr(string(v.SpawnHostExpiration))
 		n.CommitQueue = ToStringPtr(string(v.CommitQueue))
+		n.BonuslyBet = ToStringPtr(string(v.BonuslyBet))
 		if v.BuildBreakID != "" {
 			n.BuildBreakID = ToStringPtr(v.BuildBreakID)
 		}
@@ -182,6 +185,9 @@ func (n *APINotificationPreferences) BuildFromService(h interface{}) error {
 		if v.CommitQueueID != "" {
 			n.CommitQueueID = ToStringPtr(v.CommitQueueID)
 		}
+		if v.BonuslyBetID != "" {
+			n.BonuslyBetID = ToStringPtr(v.BonuslyBetID)
+		}
 	default:
 		return errors.Errorf("incorrect type for APINotificationPreferences")
 	}
@@ -198,6 +204,7 @@ func (n *APINotificationPreferences) ToService() (interface{}, error) {
 	spawnHostExpiration := FromStringPtr(n.SpawnHostExpiration)
 	spawnHostOutcome := FromStringPtr(n.SpawnHostOutcome)
 	commitQueue := FromStringPtr(n.CommitQueue)
+	bonuslyBet := FromStringPtr(n.BonuslyBet)
 	if !user.IsValidSubscriptionPreference(buildbreak) {
 		return nil, errors.New("Build break preference is not a valid type")
 	}
@@ -216,6 +223,9 @@ func (n *APINotificationPreferences) ToService() (interface{}, error) {
 	if !user.IsValidSubscriptionPreference(commitQueue) {
 		return nil, errors.New("Commit Queue preference is not a valid type")
 	}
+	if !user.IsValidSubscriptionPreference(bonuslyBet) {
+		return nil, errors.New("Bonusly bet preference is not a valid type")
+	}
 	preferences := user.NotificationPreferences{
 		BuildBreak:          user.UserSubscriptionPreference(buildbreak),
 		PatchFinish:         user.UserSubscriptionPreference(patchFinish),
@@ -223,6 +233,7 @@ func (n *APINotificationPreferences) ToService() (interface{}, error) {
 		SpawnHostOutcome:    user.UserSubscriptionPreference(spawnHostOutcome),
 		SpawnHostExpiration: user.UserSubscriptionPreference(spawnHostExpiration),
 		CommitQueue:         user.UserSubscriptionPreference(commitQueue),
+		BonuslyBet:          user.UserSubscriptionPreference(bonuslyBet),
 	}
 	preferences.BuildBreakID = FromStringPtr(n.BuildBreakID)
 	preferences.PatchFinishID = FromStringPtr(n.PatchFinishID)
@@ -230,6 +241,7 @@ func (n *APINotificationPreferences) ToService() (interface{}, error) {
 	preferences.SpawnHostOutcomeID = FromStringPtr(n.SpawnHostOutcomeID)
 	preferences.SpawnHostExpirationID = FromStringPtr(n.SpawnHostExpirationID)
 	preferences.CommitQueueID = FromStringPtr(n.CommitQueueID)
+	preferences.BonuslyBetID = FromStringPtr(n.BonuslyBetID)
 	return preferences, nil
 }
 

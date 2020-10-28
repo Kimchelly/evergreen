@@ -54,13 +54,15 @@ const (
 	ImplicitSubscriptionBuildBreak                    = "build-break"
 	ImplicitSubscriptionSpawnhostExpiration           = "spawnhost-expiration"
 	ImplicitSubscriptionSpawnHostOutcome              = "spawnhost-outcome"
+	ImplicitSubscriptionCommitQueue                   = "commit-queue"
+	ImplicitSubscriptionBonuslyBet                    = "bonusly-bet"
 
-	ImplicitSubscriptionCommitQueue = "commit-queue"
-	ObjectTask                      = "task"
-	ObjectVersion                   = "version"
-	ObjectBuild                     = "build"
-	ObjectHost                      = "host"
-	ObjectPatch                     = "patch"
+	ObjectTask       = "task"
+	ObjectVersion    = "version"
+	ObjectBuild      = "build"
+	ObjectHost       = "host"
+	ObjectPatch      = "patch"
+	ObjectBonuslyBet = "bonusly-bet"
 
 	TriggerOutcome                   = "outcome"
 	TriggerFailure                   = "failure"
@@ -71,6 +73,7 @@ const (
 	TriggerExpiration                = "expiration"
 	TriggerPatchStarted              = "started"
 	TriggerTaskFirstFailureInVersion = "first-failure-in-version"
+	TriggerMentioned                 = "mentioned"
 )
 
 type Subscription struct {
@@ -138,6 +141,7 @@ const (
 	SelectorBuildVariant = "build-variant"
 	SelectorInVersion    = "in-version"
 	SelectorInBuild      = "in-build"
+	SelectorMentioned    = "mentioned"
 )
 
 // FindSubscriptions finds all subscriptions of matching resourceType, and whose
@@ -470,6 +474,8 @@ func CreateOrUpdateImplicitSubscription(resourceType string, id string,
 				temp = NewSpawnHostOutcomeByOwner(user, subscriber)
 			case ImplicitSubscriptionCommitQueue:
 				temp = NewCommitQueueSubscriptionByOwner(user, subscriber)
+			case ImplicitSubscriptionBonuslyBet:
+				temp = NewBonuslyBetSubscriptionByOwner(user, subscriber)
 			default:
 				return nil, errors.Errorf("unknown subscription resource type: %s", resourceType)
 			}
@@ -621,4 +627,25 @@ func NewSpawnHostOutcomeByOwner(owner string, sub Subscriber) Subscription {
 
 func NewCommitQueueSubscriptionByOwner(owner string, sub Subscriber) Subscription {
 	return NewSubscriptionByOwner(owner, sub, ResourceTypeCommitQueue, TriggerOutcome)
+}
+
+// kim: TODO: should this trigger for mentions as well as bet outcomes?
+func NewBonuslyBetSubscriptionByOwner(owner string, sub Subscriber) Subscription {
+	// kim: TODO: no clue if this is correct
+	return NewSubscriptionByOwner(owner, sub, ResourceTypeBonuslyBet, TriggerMentioned)
+	// return Subscription{
+	//     ResourceType: ResourceTypeBonuslyBet,
+	//     Trigger:      Trigg
+	//     Selectors: []Selector{
+	//         {
+	//             Type: SelectorObject,
+	//             Data: ObjectBonuslyBet,
+	//         },
+	//         {
+	//             Type: SelectorMentioned,
+	//             Data: mentionedUser,
+	//         },
+	//     },
+	//     Subscriber: sub,
+	// }
 }

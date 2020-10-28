@@ -1,4 +1,4 @@
-package pool
+package betpool
 
 import (
 	"github.com/evergreen-ci/evergreen/db"
@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	Collection = "bonusly_pools"
+	Collection = "bonusly_bet_pools"
 )
 
 var (

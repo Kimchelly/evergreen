@@ -120,3 +120,7 @@ func adminEventDataFactory() interface{} {
 func userEventDataFactory() interface{} {
 	return &userData{}
 }
+
+func bonuslyBetEventDataFactory() interface{} {
+	return &BonuslyBetEventData{}
+}

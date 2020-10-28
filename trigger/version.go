@@ -7,7 +7,7 @@ import (
 
 	"github.com/evergreen-ci/evergreen"
 	"github.com/evergreen-ci/evergreen/model"
-	"github.com/evergreen-ci/evergreen/model/bonusly/pool"
+	"github.com/evergreen-ci/evergreen/model/bonusly/betpool"
 	"github.com/evergreen-ci/evergreen/model/event"
 	"github.com/evergreen-ci/evergreen/model/notification"
 	"github.com/evergreen-ci/evergreen/model/task"
@@ -165,7 +165,7 @@ func (t *versionTriggers) versionOutcome(sub *event.Subscription) (*notification
 }
 
 func (t *versionTriggers) handleBonuslyBets() error {
-	bps, err := pool.FindAll(pool.ByVersionID(t.version.Id))
+	bps, err := betpool.FindAll(betpool.ByVersionID(t.version.Id))
 	if err != nil {
 		return errors.Wrap(err, "finding betting pools")
 	}

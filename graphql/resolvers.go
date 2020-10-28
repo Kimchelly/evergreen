@@ -19,9 +19,9 @@ import (
 	"github.com/evergreen-ci/evergreen/apimodels"
 	"github.com/evergreen-ci/evergreen/cloud"
 	"github.com/evergreen-ci/evergreen/model"
+	"github.com/evergreen-ci/evergreen/model/bonusly"
 	"github.com/evergreen-ci/evergreen/model/bonusly/bet"
-	"github.com/evergreen-ci/evergreen/model/bonusly/parser"
-	"github.com/evergreen-ci/evergreen/model/bonusly/pool"
+	"github.com/evergreen-ci/evergreen/model/bonusly/betpool"
 	"github.com/evergreen-ci/evergreen/model/build"
 	"github.com/evergreen-ci/evergreen/model/comment"
 	"github.com/evergreen-ci/evergreen/model/commitqueue"
@@ -1595,6 +1595,9 @@ func (r *mutationResolver) AddComment(ctx context.Context, resourceType string, 
 		newThread = true
 	}
 	authUser := gimlet.GetUser(ctx)
+	if err := handleBonuslyBetComment(ctx, message, resourceType, resourceID, authUser.Username(), thread, newThread); err != nil {
+		return false, err
+	}
 	comment := comment.Comment{
 		Id:           thread,
 		CreateTime:   time.Now(),
@@ -1604,79 +1607,95 @@ func (r *mutationResolver) AddComment(ctx context.Context, resourceType string, 
 		ThreadId:     thread,
 		UserId:       authUser.Username(),
 	}
-	if parser.IsBonuslyBet(message) {
-		var bp *pool.BettingPool
-		var b *bet.Bet
-		var err error
-		if newThread {
-			var bpOpts *parser.BettingPoolOptions
-			// kim: TODO: notify mentioned users
-			bpOpts, b, err = parser.ParseBettingPoolComment(message, authUser.Username())
-			if err != nil {
-				return false, InputValidationError.Send(ctx, fmt.Sprintf("invalid Bonusly bet to start betting pool: %s", err.Error()))
-			}
-			bp := &pool.BettingPool{
-				ID:         thread,
-				MinimumBet: bpOpts.MinimumBet,
-			}
-			switch resourceType {
-			case "task":
-				t, err := task.FindOne(task.ById(resourceID))
-				if err != nil {
-					return false, InternalServerError.Send(ctx, fmt.Sprintf("finding task '%s': %s", resourceID, err.Error()))
-				}
-				if t == nil {
-					return false, InternalServerError.Send(ctx, fmt.Sprintf("could not find task '%s'", resourceID))
-				}
-				if err := bet.ValidateBetSubmissionStatusForTask(t.Status); err != nil {
-					return false, InternalServerError.Send(ctx, fmt.Sprintf("invalid task status '%s' for submitting bet: %s", resourceID, err.Error()))
-				}
-				bp.TaskID = resourceID
-			case "version":
-				v, err := model.VersionFindOneId(resourceID)
-				if err != nil {
-					return false, InternalServerError.Send(ctx, fmt.Sprintf("finding version '%s': %s", resourceID, err.Error()))
-				}
-				if v == nil {
-					return false, InternalServerError.Send(ctx, fmt.Sprintf("could not find version '%s'", resourceID))
-				}
-				if err := bet.ValidateBetSubmissionStatusForVersion(v.Status); err != nil {
-					return false, InternalServerError.Send(ctx, fmt.Sprintf("invalid version status '%s' for submitting bet: %s", resourceID, err.Error()))
-				}
-				bp.VersionID = resourceID
-			default:
-				return false, InputValidationError.Send(ctx, fmt.Sprintf("invalid resource type %s", resourceType))
-			}
-			if err := bp.Insert(); err != nil {
-				return false, InternalServerError.Send(ctx, "adding new Bonusly betting pool")
-			}
-		} else {
-			b, err = parser.ParseBetComment(message, authUser.Username())
-			if err != nil {
-				return false, InputValidationError.Send(ctx, fmt.Sprintf("invalid Bonusly bet: %s", err.Error()))
-			}
-			if bp, err = pool.FindOne(pool.ByID(thread)); err != nil {
-				return false, InternalServerError.Send(ctx, fmt.Sprintf("finding Bonusly betting pool for thread"))
-			}
-			if bp == nil {
-				return false, InternalServerError.Send(ctx, "could not find Bonusly betting pool for thread")
-			}
-		}
-		if err := b.Validate(); err != nil {
-			return false, InternalServerError.Send(ctx, fmt.Sprintf("validating new Bonusly bet: %s", err.Error()))
-		}
-		if err := b.Insert(); err != nil {
-			return false, InternalServerError.Send(ctx, fmt.Sprintf("inserting new Bonusly bet: %s", err.Error()))
-		}
-		if err := bp.AddBet(b); err != nil {
-			return false, InternalServerError.Send(ctx, "could not add bet to betting pool")
-		}
-	}
 	err := comment.Insert()
 	if err != nil {
 		return false, InternalServerError.Send(ctx, fmt.Sprintf("error inserting comment: %s", err.Error()))
 	}
 	return true, nil
+}
+
+func handleBonuslyBetComment(ctx context.Context, resourceType, resourceID, comment, userID, threadID string, newThread bool) error {
+	if !bonusly.IsBonuslyBet(comment) {
+		return nil
+	}
+	var bp *betpool.BettingPool
+	var b bet.Bet
+	var pb *bonusly.ParsedBet
+	var userMentions []string
+
+	if newThread {
+		pbp, err := bonusly.ParseBettingPoolComment(comment, userID)
+		if err != nil {
+			return InputValidationError.Send(ctx, fmt.Sprintf("invalid Bonusly bet to start betting pool: %s", err.Error()))
+		}
+		b = pbp.Bet
+		pb = &pbp.ParsedBet
+		userMentions = pbp.UserMentions
+		bp := &betpool.BettingPool{
+			ID:         threadID,
+			MinimumBet: pbp.MinimumBet,
+		}
+		switch resourceType {
+		case "task":
+			t, err := task.FindOne(task.ById(resourceID))
+			if err != nil {
+				return InternalServerError.Send(ctx, fmt.Sprintf("finding task '%s': %s", resourceID, err.Error()))
+			}
+			if t == nil {
+				return InternalServerError.Send(ctx, fmt.Sprintf("could not find task '%s'", resourceID))
+			}
+			if err := bet.ValidateBetSubmissionStatusForTask(t.Status); err != nil {
+				return InternalServerError.Send(ctx, fmt.Sprintf("invalid task status '%s' for submitting bet: %s", resourceID, err.Error()))
+			}
+			bp.TaskID = resourceID
+		case "version":
+			v, err := model.VersionFindOneId(resourceID)
+			if err != nil {
+				return InternalServerError.Send(ctx, fmt.Sprintf("finding version '%s': %s", resourceID, err.Error()))
+			}
+			if v == nil {
+				return InternalServerError.Send(ctx, fmt.Sprintf("could not find version '%s'", resourceID))
+			}
+			if err := bet.ValidateBetSubmissionStatusForVersion(v.Status); err != nil {
+				return InternalServerError.Send(ctx, fmt.Sprintf("invalid version status '%s' for submitting bet: %s", resourceID, err.Error()))
+			}
+			bp.VersionID = resourceID
+		default:
+			return InputValidationError.Send(ctx, fmt.Sprintf("invalid resource type %s", resourceType))
+		}
+		if err := bp.Insert(); err != nil {
+			return InternalServerError.Send(ctx, "adding new Bonusly betting pool")
+		}
+	} else {
+		var err error
+		pb, err = bonusly.ParseBetComment(comment, userID)
+		if err != nil {
+			return InputValidationError.Send(ctx, fmt.Sprintf("invalid Bonusly bet: %s", err.Error()))
+		}
+		b = pb.Bet
+		userMentions = pb.UserMentions
+		if bp, err = betpool.FindOne(betpool.ByID(threadID)); err != nil {
+			return InternalServerError.Send(ctx, fmt.Sprintf("finding Bonusly betting pool for thread: %s", err.Error()))
+		}
+		if bp == nil {
+			return InternalServerError.Send(ctx, "could not find Bonusly betting pool for thread")
+		}
+	}
+	if err := b.Validate(); err != nil {
+		return InternalServerError.Send(ctx, fmt.Sprintf("validating new Bonusly bet: %s", err.Error()))
+	}
+	if err := b.Insert(); err != nil {
+		return InternalServerError.Send(ctx, fmt.Sprintf("inserting new Bonusly bet: %s", err.Error()))
+	}
+	if err := bp.AddBet(b); err != nil {
+		return InternalServerError.Send(ctx, "could not add bet to betting pool")
+	}
+
+	for _, mentionedUser := range userMentions {
+		event.LogBonuslyBetUserMentioned(bp.ID, userID, mentionedUser)
+	}
+
+	return nil
 }
 
 func (r *mutationResolver) SetTaskPriority(ctx context.Context, taskID string, priority int) (*restModel.APITask, error) {

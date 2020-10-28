@@ -1,4 +1,4 @@
-package parser
+package bonusly
 
 import (
 	"strconv"
@@ -33,56 +33,64 @@ func IsBonuslyBet(message string) bool {
 	return strings.HasPrefix(strings.TrimSpace(message), betCommand)
 }
 
-type BettingPoolOptions struct {
-	UserMentions []string
-	MinimumBet   int
+// ParsedBettingPool represents the options parsed from a betting pool comment.
+type ParsedBettingPool struct {
+	ParsedBet
+	MinimumBet int
 }
 
-// ParseBettingPoolComment parses the Bonusly bet to initialize a betting pool.
+// ParseBettingPoolComment parses a Bonusly bet comment to initialize a betting
+// pool.
 // Valid betting comments take the form: /bet <expected_outcome> [+]amount [+]minBet [@user1, @user2...] [comment]
-func ParseBettingPoolComment(message, userID string) (*BettingPoolOptions, *bet.Bet, error) {
+func ParseBettingPoolComment(message, userID string) (*ParsedBettingPool, error) {
 	var err error
 	if message, err = parseBetCommand(message); err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	var status string
 	if message, status, err = parseExpectedStatus(message); err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	var amount int
 	if message, amount, err = parseAmount(message); err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	var minBet int
 	message, minBet, _ = parseAmount(message)
+	if minBet == -1 {
+		minBet = 0
+	}
 
 	var userMentions []string
 	message, userMentions = parseUserMentions(message)
 
-	b := bet.Bet{
-		ID:             primitive.NewObjectID().String(),
-		UserID:         userID,
-		ExpectedStatus: status,
-		Amount:         amount,
-		Message:        strings.TrimSpace(message),
-	}
+	return &ParsedBettingPool{
+		ParsedBet: ParsedBet{
+			Bet: bet.Bet{
+				ID:             primitive.NewObjectID().String(),
+				UserID:         userID,
+				ExpectedStatus: status,
+				Amount:         amount,
+				Message:        strings.TrimSpace(message),
+			},
 
-	if minBet == -1 {
-		minBet = 0
-	}
-	opts := BettingPoolOptions{
-		MinimumBet:   minBet,
-		UserMentions: userMentions,
-	}
-
-	return &opts, &b, nil
+			UserMentions: userMentions,
+		},
+		MinimumBet: minBet,
+	}, nil
 }
 
-// ParseBetComment parses the Bonusly bet command.
-func ParseBetComment(message, userID string) (*bet.Bet, error) {
+// ParsedBettingPool represents the options parsed from a Bonusly bet comment.
+type ParsedBet struct {
+	Bet          bet.Bet
+	UserMentions []string
+}
+
+// ParseBetComment parses a Bonusly bet comment.
+func ParseBetComment(message, userID string) (*ParsedBet, error) {
 	var err error
 	if message, err = parseBetCommand(message); err != nil {
 		return nil, errors.WithStack(err)
@@ -96,15 +104,19 @@ func ParseBetComment(message, userID string) (*bet.Bet, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	b := bet.Bet{
-		ID:             primitive.NewObjectID().String(),
-		UserID:         userID,
-		ExpectedStatus: status,
-		Amount:         amount,
-		Message:        strings.TrimSpace(message),
-	}
+	var userMentions []string
+	message, userMentions = parseUserMentions(message)
 
-	return &b, nil
+	return &ParsedBet{
+		Bet: bet.Bet{
+			ID:             primitive.NewObjectID().String(),
+			UserID:         userID,
+			ExpectedStatus: status,
+			Amount:         amount,
+			Message:        strings.TrimSpace(message),
+		},
+		UserMentions: userMentions,
+	}, nil
 }
 
 func parseBetCommand(message string) (parsed string, err error) {

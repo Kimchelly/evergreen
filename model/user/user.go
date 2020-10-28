@@ -91,6 +91,8 @@ type NotificationPreferences struct {
 	SpawnHostOutcomeID    string                     `bson:"spawn_host_outcome_id,omitempty" json:"-"`
 	CommitQueue           UserSubscriptionPreference `bson:"commit_queue" json:"commit_queue"`
 	CommitQueueID         string                     `bson:"commit_queue_id,omitempty" json:"-"`
+	BonuslyBet            UserSubscriptionPreference `bson:"bonusly_bet,omitempty" json:"bonusly_bet"`
+	BonuslyBetID          string                     `bson:"bonusly_bet_id,omitempty" json:"-"`
 }
 
 type UserSubscriptionPreference string

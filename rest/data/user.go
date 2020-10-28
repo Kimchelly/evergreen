@@ -40,6 +40,7 @@ func (u *DBUserConnector) DeletePublicKey(user *user.DBUser, keyName string) err
 	return user.DeletePublicKey(keyName)
 }
 
+// kim: TODO: add code to handle Bonusly bet subscriptions.
 func (u *DBUserConnector) UpdateSettings(dbUser *user.DBUser, settings user.UserSettings) error {
 	if strings.HasPrefix(settings.SlackUsername, "#") {
 		return gimlet.ErrorResponse{
@@ -159,6 +160,28 @@ func (u *DBUserConnector) UpdateSettings(dbUser *user.DBUser, settings user.User
 		settings.Notifications.CommitQueueID = commitQueueSubscription.ID
 	} else {
 		settings.Notifications.CommitQueueID = ""
+	}
+
+	var bonuslyBetSubscriber event.Subscriber
+	switch settings.Notifications.BonuslyBet {
+	case user.PreferenceSlack:
+		bonuslyBetSubscriber = event.NewSlackSubscriber(fmt.Sprintf("@%s", settings.SlackUsername))
+	case user.PreferenceEmail:
+		bonuslyBetSubscriber = event.NewEmailSubscriber(dbUser.Email())
+	}
+	bonuslyBetSubscription, err := event.CreateOrUpdateImplicitSubscription(
+		event.ImplicitSubscriptionBonuslyBet,
+		dbUser.Settings.Notifications.BonuslyBetID,
+		bonuslyBetSubscriber,
+		dbUser.Id,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to create Bonusly bet subscription")
+	}
+	if bonuslyBetSubscription != nil {
+		settings.Notifications.BonuslyBetID = bonuslyBetSubscription.ID
+	} else {
+		settings.Notifications.BonuslyBetID = ""
 	}
 
 	return model.SaveUserSettings(dbUser.Id, settings)

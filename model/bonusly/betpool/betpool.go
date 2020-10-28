@@ -1,4 +1,4 @@
-package pool
+package betpool
 
 import (
 	"context"
@@ -120,11 +120,8 @@ func (bp *BettingPool) Insert() error {
 }
 
 // AddBet adds a new bet to the betting pool.
-func (bp *BettingPool) AddBet(b *bet.Bet) error {
-	if b == nil {
-		return errors.Errorf("cannot add nil bet")
-	}
-	if err := bp.ValidateBet(*b); err != nil {
+func (bp *BettingPool) AddBet(b bet.Bet) error {
+	if err := bp.ValidateBet(b); err != nil {
 		return errors.Wrap(err, "invalid bet")
 	}
 	if err := b.Insert(); err != nil {
