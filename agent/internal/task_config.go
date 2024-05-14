@@ -43,7 +43,7 @@ type TaskConfig struct {
 	ModulePaths        map[string]string
 	CedarTestResultsID string
 	TaskGroup          *model.TaskGroup
-	PublicFuncs        map[model.FunctionVersion]model.PublicFunction
+	PublicFuncs        map[string]model.SortablePublicFunctions
 
 	mu sync.RWMutex
 }
@@ -138,7 +138,7 @@ func NewTaskConfig(workDir string, d *apimodels.DistroView, pubFuncs []model.Pub
 		Distro:            d,
 		ProjectRef:        *r,
 		Project:           *p,
-		PublicFuncs:       model.MakePublicFunctionMap(pubFuncs),
+		PublicFuncs:       model.MakeSortedPublicFunctionMap(pubFuncs),
 		Task:              *t,
 		BuildVariant:      *bv,
 		Expansions:        e.Expansions,

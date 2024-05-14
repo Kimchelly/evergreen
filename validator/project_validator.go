@@ -1320,7 +1320,7 @@ func validateDisplayTaskNames(project *model.Project) ValidationErrors {
 }
 
 // Helper for validating a set of plugin commands given a project/registry
-func validateCommands(section string, pubFuncs map[model.FunctionVersion]model.PublicFunction, project *model.Project,
+func validateCommands(section string, pubFuncs map[string]model.SortablePublicFunctions, project *model.Project,
 	commands []model.PluginCommandConf) ValidationErrors {
 	errs := ValidationErrors{}
 
@@ -1370,7 +1370,7 @@ func validatePluginCommands(project *model.Project) ValidationErrors {
 			Message: errors.Wrap(err, "finding public functions").Error(),
 		})
 	}
-	allPubFuncsMap := model.MakePublicFunctionMap(allPubFuncs)
+	allPubFuncsMap := model.MakeSortedPublicFunctionMap(allPubFuncs)
 
 	seen := make(map[string]bool)
 

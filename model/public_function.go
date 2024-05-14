@@ -3,12 +3,12 @@ package model
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/evergreen-ci/evergreen"
 	"github.com/mongodb/anser/bsonutil"
 	"github.com/mongodb/grip"
-	"github.com/mongodb/grip/message"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -43,7 +43,8 @@ type FunctionVersion struct {
 	// Name of the function. Can't reuse existing command names (e.g.
 	// shell.exec), or function names already defined in the YAML.
 	Name string `bson:"name" json:"name"`
-	// Semver just in case the user implementation changes in the future.
+	// Versioned functions in case the user implementation changes in the
+	// future. These are just ints, but it can be the special string "latest".
 	// kim: NOTE: only supports explicit version strings for now, not implicit
 	// "latest", because I don't feel like writing the aggregation to get the
 	// max value.
@@ -62,24 +63,77 @@ func NewFunctionVersion(name, version string) FunctionVersion {
 }
 
 // NewFunctionVersionFromString parses a string in the format "name@version"
-// (e.g. "send-slack-notification@v1.2.3") into a FunctionVersion.
+// (e.g. "send-slack-notification@v1") into a FunctionVersion. If no version
+// is specified, it's assumed to be the latest.
 func NewFunctionVersionFromString(nameAndVersion string) FunctionVersion {
 	parts := strings.Split(nameAndVersion, "@")
 	if len(parts) != 2 {
-		return FunctionVersion{}
+		// If there's no "@version" part, use the latest version.
+		return FunctionVersion{
+			Name:    nameAndVersion,
+			Version: LatestPublicFunctionVersion,
+		}
 	}
-	return NewFunctionVersion(parts[0], parts[1])
+	name := parts[0]
+	version := strings.TrimPrefix(parts[1], "v")
+	return NewFunctionVersion(name, version)
 }
 
-func MakePublicFunctionMap(pubFuncs []PublicFunction) map[FunctionVersion]PublicFunction {
-	m := map[FunctionVersion]PublicFunction{}
-	for _, f := range pubFuncs {
-		m[f.FunctionVersion] = f
+type SortablePublicFunctions []PublicFunction
+
+func (spf SortablePublicFunctions) Len() int { return len(spf) }
+func (spf SortablePublicFunctions) Swap(i, j int) {
+	spf[i], spf[j] = spf[j], spf[i]
+}
+
+func (spf SortablePublicFunctions) Less(i, j int) bool {
+	pubFunc1 := spf[i]
+	pubFunc2 := spf[j]
+	if pubFunc1.Name != pubFunc2.Name {
+		return pubFunc1.Name < pubFunc2.Name
 	}
-	grip.Info(message.Fields{
-		"message": "kim: made public functions map",
-		"map":     fmt.Sprintf("%#v", m),
-	})
+	return pubFunc1.Version < pubFunc2.Version
+}
+
+// Special constant to indicate that the current latest version of a function
+// should be used.
+const LatestPublicFunctionVersion = "latest"
+
+func (spf SortablePublicFunctions) Find(fv FunctionVersion) *PublicFunction {
+	if len(spf) == 0 {
+		return nil
+	}
+
+	if fv.Version == "" || fv.Version == LatestPublicFunctionVersion {
+		if !sort.IsSorted(spf) {
+			sort.Sort(spf)
+		}
+		// Since it's sorted in version ascending order, the last one is the
+		// latest version.
+		return &spf[len(spf)-1]
+	}
+
+	for _, pf := range spf {
+		if pf.FunctionVersion == fv {
+			return &pf
+		}
+	}
+	return nil
+}
+
+// MakeSortedPublicFunctionMap returns a map of public function name to a sorted
+// list of public functions, one per version of that function. For each
+// function name, the versions of it are sorted in ascending order.
+func MakeSortedPublicFunctionMap(pubFuncs []PublicFunction) map[string]SortablePublicFunctions {
+	m := map[string]SortablePublicFunctions{}
+	for _, pubFunc := range pubFuncs {
+		m[pubFunc.Name] = append(m[pubFunc.Name], pubFunc)
+	}
+	for name, pubFuncs := range m {
+		sortedPubFuncs := pubFuncs
+		sort.Sort(sortedPubFuncs)
+		m[name] = sortedPubFuncs
+	}
 	return m
 }
 
