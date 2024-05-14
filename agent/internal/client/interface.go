@@ -60,6 +60,7 @@ type SharedCommunicator interface {
 	GetDistroAMI(context.Context, string, string, TaskData) (string, error)
 	// GetProject loads the project using the task's version ID.
 	GetProject(context.Context, TaskData) (*model.Project, error)
+	GetPublicFunctions(context.Context, TaskData, ...model.FunctionVersion) ([]model.PublicFunction, error)
 	// Heartbeat will return a non-empty task status if the agent should stop running the task.
 	// Returning evergreen.TaskFailed means that the task has been aborted. An empty string
 	// indicates the heartbeat has succeeded.

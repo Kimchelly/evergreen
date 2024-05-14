@@ -70,8 +70,8 @@ func GetCommandFactory(name string) (CommandFactory, bool) {
 // run. It resolves the command specification into either a single command (in
 // the case of standalone command) or a list of commands (in the case of a
 // function).
-func Render(c model.PluginCommandConf, project *model.Project, blockInfo BlockInfo) ([]Command, error) {
-	return evgRegistry.renderCommands(c, project, blockInfo)
+func Render(c model.PluginCommandConf, publicFuncs map[model.FunctionVersion]model.PublicFunction, project *model.Project, blockInfo BlockInfo) ([]Command, error) {
+	return evgRegistry.renderCommands(c, publicFuncs, project, blockInfo)
 }
 
 func RegisteredCommandNames() []string { return evgRegistry.registeredCommandNames() }
@@ -131,16 +131,22 @@ func (r *commandRegistry) getCommandFactory(name string) (CommandFactory, bool) 
 	return factory, ok
 }
 
-func (r *commandRegistry) renderCommands(commandInfo model.PluginCommandConf,
-	project *model.Project, blockInfo BlockInfo) ([]Command, error) {
+func resolveFunc(publicFuncs map[model.FunctionVersion]model.PublicFunction, project *model.Project, funcName string) *model.YAMLCommandSet {
+	if cmds, ok := project.Functions[funcName]; ok {
+		return cmds
+	}
+	if pubFunc, ok := publicFuncs[model.NewFunctionVersionFromString(funcName)]; ok {
+		return &pubFunc.Commands
+	}
+	return nil
+}
 
+func (r *commandRegistry) renderCommands(commandInfo model.PluginCommandConf, publicFuncs map[model.FunctionVersion]model.PublicFunction, project *model.Project, blockInfo BlockInfo) ([]Command, error) {
 	var parsed []model.PluginCommandConf
-
 	catcher := grip.NewBasicCatcher()
-
 	if funcName := commandInfo.Function; funcName != "" {
-		cmds, ok := project.Functions[funcName]
-		if !ok {
+		cmds := resolveFunc(publicFuncs, project, funcName)
+		if cmds == nil {
 			catcher.Errorf("function '%s' not found in project functions", funcName)
 		} else if cmds != nil {
 			cmdsInFunc := cmds.List()

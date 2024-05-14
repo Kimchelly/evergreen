@@ -579,6 +579,43 @@ func (h *getParserProjectHandler) Run(ctx context.Context) gimlet.Responder {
 	return gimlet.NewBinaryResponse(projBytes)
 }
 
+// GET /tasks/{task_id}/public_functions
+
+type getPublicFunctionsHandler struct {
+	funcs []model.FunctionVersion
+}
+
+func makeGetPublicFunctionsHandler() gimlet.RouteHandler {
+	return &getPublicFunctionsHandler{}
+}
+
+func (h *getPublicFunctionsHandler) Factory() gimlet.RouteHandler {
+	return &getPublicFunctionsHandler{}
+}
+
+func (h *getPublicFunctionsHandler) Parse(ctx context.Context, r *http.Request) error {
+	if err := utility.ReadJSON(r.Body, &h.funcs); err != nil {
+		return errors.Wrap(err, "reading public functions from JSON request body")
+	}
+	return nil
+}
+
+func (h *getPublicFunctionsHandler) Run(ctx context.Context) gimlet.Responder {
+	var pubFuncs []model.PublicFunction
+	var err error
+	if len(h.funcs) == 0 {
+		// kim: NOTE: shouldn't support this case since it's not efficient, but
+		// it makes it easier to e2e test faster.
+		pubFuncs, err = model.FindAllPublicFunctions(ctx, bson.M{})
+	} else {
+		pubFuncs, err = model.FindPublicFunctionsByFunctionVersions(ctx, h.funcs...)
+	}
+	if err != nil {
+		return gimlet.MakeJSONInternalErrorResponder(errors.Wrap(err, "finding public functions for task"))
+	}
+	return gimlet.NewJSONResponse(pubFuncs)
+}
+
 // GET /task/{task_id}/distro_view
 type getDistroViewHandler struct {
 	hostID string

@@ -308,7 +308,7 @@ func (s *GitGetProjectSuite) TestGitPlugin() {
 	for _, task := range conf.Project.Tasks {
 		s.NotEqual(len(task.Commands), 0)
 		for _, command := range task.Commands {
-			pluginCmds, err := Render(command, &conf.Project, BlockInfo{})
+			pluginCmds, err := Render(command, nil, &conf.Project, BlockInfo{})
 			s.NoError(err)
 			s.NotNil(pluginCmds)
 			pluginCmds[0].SetJasperManager(s.jasper)
@@ -350,7 +350,7 @@ func (s *GitGetProjectSuite) TestTokenScrubbedFromLogger() {
 	for _, task := range conf.Project.Tasks {
 		s.NotEqual(len(task.Commands), 0)
 		for _, command := range task.Commands {
-			pluginCmds, err := Render(command, &conf.Project, BlockInfo{})
+			pluginCmds, err := Render(command, nil, &conf.Project, BlockInfo{})
 			s.NoError(err)
 			s.NotNil(pluginCmds)
 			pluginCmds[0].SetJasperManager(s.jasper)
@@ -392,7 +392,7 @@ func (s *GitGetProjectSuite) TestStdErrLogged() {
 	for _, task := range conf.Project.Tasks {
 		s.NotEqual(len(task.Commands), 0)
 		for _, command := range task.Commands {
-			pluginCmds, err := Render(command, &conf.Project, BlockInfo{})
+			pluginCmds, err := Render(command, nil, &conf.Project, BlockInfo{})
 			s.NoError(err)
 			s.NotNil(pluginCmds)
 			pluginCmds[0].SetJasperManager(s.jasper)
@@ -435,7 +435,7 @@ func (s *GitGetProjectSuite) TestValidateGitCommands() {
 
 	for _, task := range conf.Project.Tasks {
 		for _, command := range task.Commands {
-			pluginCmds, err = Render(command, &conf.Project, BlockInfo{})
+			pluginCmds, err = Render(command, nil, &conf.Project, BlockInfo{})
 			s.NoError(err)
 			s.NotNil(pluginCmds)
 			pluginCmds[0].SetJasperManager(s.jasper)
@@ -763,7 +763,7 @@ func (s *GitGetProjectSuite) TestCorrectModuleRevisionSetModule() {
 		s.NotEqual(len(task.Commands), 0)
 		for _, command := range task.Commands {
 			var pluginCmds []Command
-			pluginCmds, err = Render(command, &conf.Project, BlockInfo{})
+			pluginCmds, err = Render(command, nil, &conf.Project, BlockInfo{})
 			s.NoError(err)
 			s.NotNil(pluginCmds)
 			pluginCmds[0].SetJasperManager(s.jasper)
@@ -810,7 +810,7 @@ func (s *GitGetProjectSuite) TestMultipleModules() {
 	for _, task := range conf.Project.Tasks {
 		s.NotEqual(len(task.Commands), 0)
 		for _, command := range task.Commands {
-			pluginCmds, err = Render(command, &conf.Project, BlockInfo{})
+			pluginCmds, err = Render(command, nil, &conf.Project, BlockInfo{})
 			s.NoError(err)
 			s.NotNil(pluginCmds)
 			pluginCmds[0].SetJasperManager(s.jasper)
@@ -871,7 +871,7 @@ func (s *GitGetProjectSuite) TestCorrectModuleRevisionManifest() {
 		s.NotEqual(len(task.Commands), 0)
 		for _, command := range task.Commands {
 			var pluginCmds []Command
-			pluginCmds, err = Render(command, &conf.Project, BlockInfo{})
+			pluginCmds, err = Render(command, nil, &conf.Project, BlockInfo{})
 			s.NoError(err)
 			s.NotNil(pluginCmds)
 			pluginCmds[0].SetJasperManager(s.jasper)
@@ -1069,7 +1069,7 @@ index edc0c34..8e82862 100644
 	for _, task := range conf.Project.Tasks {
 		s.NotEqual(len(task.Commands), 0)
 		for _, command := range task.Commands {
-			pluginCmds, err := Render(command, &conf.Project, BlockInfo{})
+			pluginCmds, err := Render(command, nil, &conf.Project, BlockInfo{})
 			s.NoError(err)
 			s.NotNil(pluginCmds)
 			pluginCmds[0].SetJasperManager(s.jasper)

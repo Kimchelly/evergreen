@@ -282,6 +282,24 @@ func (c *baseCommunicator) GetProject(ctx context.Context, taskData TaskData) (*
 	return model.GetProjectFromBSON(respBytes)
 }
 
+func (c *baseCommunicator) GetPublicFunctions(ctx context.Context, td TaskData, funcVers ...model.FunctionVersion) ([]model.PublicFunction, error) {
+	info := requestInfo{
+		method:   http.MethodGet,
+		taskData: &td,
+	}
+	info.setTaskPathSuffix("public_functions")
+	resp, err := c.retryRequest(ctx, info, funcVers)
+	if err != nil {
+		return nil, util.RespErrorf(resp, errors.Wrap(err, "getting public functions").Error())
+	}
+	defer resp.Body.Close()
+	pubFuncs := []model.PublicFunction{}
+	if err = utility.ReadJSON(resp.Body, &pubFuncs); err != nil {
+		return nil, errors.Wrap(err, "reading public functions from response")
+	}
+	return pubFuncs, nil
+}
+
 func (c *baseCommunicator) GetExpansions(ctx context.Context, taskData TaskData) (util.Expansions, error) {
 	e := util.Expansions{}
 	info := requestInfo{

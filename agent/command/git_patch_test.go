@@ -131,7 +131,7 @@ func TestPatchPlugin(t *testing.T) {
 			for _, task := range taskConfig.Project.Tasks {
 				So(len(task.Commands), ShouldNotEqual, 0)
 				for _, command := range task.Commands {
-					pluginCmds, err := Render(command, &taskConfig.Project, BlockInfo{})
+					pluginCmds, err := Render(command, nil, &taskConfig.Project, BlockInfo{})
 					require.NoError(t, err)
 					So(pluginCmds, ShouldNotBeNil)
 					So(err, ShouldBeNil)

@@ -240,6 +240,7 @@ func TestArchiveAutoPackExecute(t *testing.T) {
 
 			conf, err := internal.NewTaskConfig(t.TempDir(),
 				&apimodels.DistroView{},
+				nil,
 				&model.Project{BuildVariants: []model.BuildVariant{{Name: "bv"}}},
 				&task.Task{BuildVariant: "bv"},
 				&model.ProjectRef{},

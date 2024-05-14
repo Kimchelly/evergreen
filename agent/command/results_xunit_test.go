@@ -53,7 +53,7 @@ func runTest(t *testing.T, configPath string, customTests func(string)) {
 			for _, projTask := range conf.Project.Tasks {
 				So(len(projTask.Commands), ShouldNotEqual, 0)
 				for _, command := range projTask.Commands {
-					pluginCmds, err := Render(command, &conf.Project, BlockInfo{})
+					pluginCmds, err := Render(command, nil, &conf.Project, BlockInfo{})
 					require.NoError(t, err)
 					So(pluginCmds, ShouldNotBeNil)
 					So(err, ShouldBeNil)

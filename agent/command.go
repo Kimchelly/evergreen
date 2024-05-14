@@ -115,8 +115,11 @@ func (a *Agent) runCommandsInBlock(ctx context.Context, tc *taskContext, cmdBloc
 			CmdNum:    i + 1,
 			TotalCmds: len(commands),
 		}
-		cmds, err := command.Render(commandInfo, &tc.taskConfig.Project, blockInfo)
+		cmds, err := command.Render(commandInfo, tc.taskConfig.PublicFuncs, &tc.taskConfig.Project, blockInfo)
 		if err != nil {
+			if commandInfo.Function != "" {
+				return errors.Wrapf(err, "rendering func '%s'", commandInfo.Function)
+			}
 			return errors.Wrapf(err, "rendering command '%s'", commandInfo.Command)
 		}
 		runCmdOpts := runCommandsOptions{

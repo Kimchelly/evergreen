@@ -30,7 +30,7 @@ func TestNewTaskConfig(t *testing.T) {
 		Version:      "v1",
 	}
 
-	taskConfig, err := NewTaskConfig(curdir, &apimodels.DistroView{}, p, task, &model.ProjectRef{
+	taskConfig, err := NewTaskConfig(curdir, &apimodels.DistroView{}, nil, p, task, &model.ProjectRef{
 		Id:         "project_id",
 		Identifier: "project_identifier",
 	}, &patch.Patch{}, &apimodels.ExpansionsAndVars{
@@ -79,7 +79,7 @@ func TestCreatesCheckRun(t *testing.T) {
 		},
 	}
 
-	tc, err := NewTaskConfig(testutil.GetDirectoryOfFile(), &apimodels.DistroView{}, p, task, &model.ProjectRef{}, &patch.Patch{}, &apimodels.ExpansionsAndVars{})
+	tc, err := NewTaskConfig(testutil.GetDirectoryOfFile(), &apimodels.DistroView{}, nil, p, task, &model.ProjectRef{}, &patch.Patch{}, &apimodels.ExpansionsAndVars{})
 	assert.NoError(t, err)
 	assert.Equal(t, true, tc.createsCheckRun())
 }

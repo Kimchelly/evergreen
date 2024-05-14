@@ -22,6 +22,7 @@ import (
 	"github.com/mongodb/grip"
 	"github.com/mongodb/grip/level"
 	"github.com/pkg/errors"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -1319,7 +1320,7 @@ func validateDisplayTaskNames(project *model.Project) ValidationErrors {
 }
 
 // Helper for validating a set of plugin commands given a project/registry
-func validateCommands(section string, project *model.Project,
+func validateCommands(section string, pubFuncs map[model.FunctionVersion]model.PublicFunction, project *model.Project,
 	commands []model.PluginCommandConf) ValidationErrors {
 	errs := ValidationErrors{}
 
@@ -1333,7 +1334,7 @@ func validateCommands(section string, project *model.Project,
 			CmdNum:    i + 1,
 			TotalCmds: len(commands),
 		}
-		_, err := command.Render(cmd, project, blockInfo)
+		_, err := command.Render(cmd, pubFuncs, project, blockInfo)
 		if err != nil {
 			errs = append(errs, ValidationError{Message: fmt.Sprintf("%s section in %s: %s", section, commandName, err)})
 		}
@@ -1357,6 +1358,20 @@ func validateCommands(section string, project *model.Project,
 // are specified in a valid format
 func validatePluginCommands(project *model.Project) ValidationErrors {
 	errs := ValidationErrors{}
+
+	// kim: NOTE: completely wrong level of abstraction going on here, but
+	// whatever. Also not that efficient, but whatever.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	allPubFuncs, err := model.FindAllPublicFunctions(ctx, bson.M{})
+	if err != nil {
+		errs = append(errs, ValidationError{
+			Level:   Error,
+			Message: errors.Wrap(err, "finding public functions").Error(),
+		})
+	}
+	allPubFuncsMap := model.MakePublicFunctionMap(allPubFuncs)
+
 	seen := make(map[string]bool)
 
 	// validate each function definition
@@ -1370,7 +1385,7 @@ func validatePluginCommands(project *model.Project) ValidationErrors {
 			)
 			continue
 		}
-		valErrs := validateCommands("functions", project, commands.List())
+		valErrs := validateCommands("functions", allPubFuncsMap, project, commands.List())
 		for _, err := range valErrs {
 			errs = append(errs,
 				ValidationError{
@@ -1404,20 +1419,20 @@ func validatePluginCommands(project *model.Project) ValidationErrors {
 	}
 
 	if project.Pre != nil {
-		errs = append(errs, validateCommands("pre", project, project.Pre.List())...)
+		errs = append(errs, validateCommands("pre", allPubFuncsMap, project, project.Pre.List())...)
 	}
 
 	if project.Post != nil {
-		errs = append(errs, validateCommands("post", project, project.Post.List())...)
+		errs = append(errs, validateCommands("post", allPubFuncsMap, project, project.Post.List())...)
 	}
 
 	if project.Timeout != nil {
-		errs = append(errs, validateCommands("timeout", project, project.Timeout.List())...)
+		errs = append(errs, validateCommands("timeout", allPubFuncsMap, project, project.Timeout.List())...)
 	}
 
 	// validate project tasks section
 	for _, task := range project.Tasks {
-		errs = append(errs, validateCommands("tasks", project, task.Commands)...)
+		errs = append(errs, validateCommands("tasks", allPubFuncsMap, project, task.Commands)...)
 	}
 	return errs
 }
