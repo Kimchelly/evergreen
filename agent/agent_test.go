@@ -136,7 +136,7 @@ func (s *AgentSuite) SetupTest() {
 		},
 		BuildVariants: []model.BuildVariant{{Name: bvName}},
 	}
-	taskConfig, err := internal.NewTaskConfig(s.testTmpDirName, &apimodels.DistroView{}, nil, project, &s.task, &model.ProjectRef{
+	taskConfig, err := internal.NewTaskConfig(s.testTmpDirName, &apimodels.DistroView{}, project, &s.task, &model.ProjectRef{
 		Id:         "project_id",
 		Identifier: "project_identifier",
 	}, &patch.Patch{}, &apimodels.ExpansionsAndVars{Expansions: util.Expansions{}})

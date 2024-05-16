@@ -216,16 +216,6 @@ func (a *Agent) makeTaskConfig(ctx context.Context, tc *taskContext) (*internal.
 		return nil, errors.Wrap(err, "fetching task info")
 	}
 
-	// kim: TODO: figure out what funcs to pass in here. It's doable but kind of
-	// annoying to tell what funcs are relevant to this task. Would need caching
-	// in advance or trying to resolve the public functions now to figure out
-	// which public functions will theoretically run in this task. Caching
-	// public function versions on task creation might be easiest.
-	pubFuncs, err := a.comm.GetPublicFunctions(ctx, tc.task)
-	if err != nil {
-		return nil, errors.Wrap(err, "fetching public functions")
-	}
-
 	grip.Info("Fetching distro configuration.")
 	var confDistro *apimodels.DistroView
 	if a.opts.Mode == globals.HostMode {
@@ -255,10 +245,24 @@ func (a *Agent) makeTaskConfig(ctx context.Context, tc *taskContext) (*internal.
 	}
 
 	grip.Info("Constructing task config.")
-	taskConfig, err := internal.NewTaskConfig(a.opts.WorkingDirectory, confDistro, pubFuncs, project, tsk, confRef, confPatch, expansionsAndVars)
+	taskConfig, err := internal.NewTaskConfig(a.opts.WorkingDirectory, confDistro, project, tsk, confRef, confPatch, expansionsAndVars)
 	if err != nil {
 		return nil, err
 	}
+
+	// kim: TODO: figure out what public funcs to request here. It's doable but
+	// kind of annoying to tell what funcs are relevant to this task. Would need
+	// caching in advance or trying to resolve the public functions now to
+	// figure out which public functions will theoretically run in this task. If
+	// we can assume that the list of commands isn't that long, then we could
+	// just get all of them using the fully-populated task context + task config
+	// (i.e. using tc.getPost, tc.getTimeout, etc.)
+	pubFuncs, err := a.comm.GetPublicFunctions(ctx, tc.task)
+	if err != nil {
+		return nil, errors.Wrap(err, "fetching public functions")
+	}
+	taskConfig.PublicFuncs = model.MakeSortedPublicFunctionMap(pubFuncs)
+
 	taskConfig.TaskSync = a.opts.SetupData.TaskSync
 	taskConfig.EC2Keys = a.opts.SetupData.EC2Keys
 

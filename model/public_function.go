@@ -44,15 +44,17 @@ type FunctionVersion struct {
 	// shell.exec), or function names already defined in the YAML.
 	Name string `bson:"name" json:"name"`
 	// Versioned functions in case the user implementation changes in the
-	// future. These are just ints, but it can be the special string "latest".
-	// kim: NOTE: only supports explicit version strings for now, not implicit
-	// "latest", because I don't feel like writing the aggregation to get the
-	// max value.
+	// future. These are just ints, but it can be the special string "latest" if
+	// looking to use the latest version of a public function.
 	Version string `bson:"version" json:"version"`
 }
 
 func (fv FunctionVersion) String() string {
 	return fmt.Sprintf("%s@%s", fv.Name, fv.Version)
+}
+
+func (fv FunctionVersion) IsLatest() bool {
+	return fv.Version == "" || fv.Version == LatestPublicFunctionVersion
 }
 
 func NewFunctionVersion(name, version string) FunctionVersion {
@@ -104,7 +106,7 @@ func (spf SortablePublicFunctions) Find(fv FunctionVersion) *PublicFunction {
 		return nil
 	}
 
-	if fv.Version == "" || fv.Version == LatestPublicFunctionVersion {
+	if fv.IsLatest() {
 		if !sort.IsSorted(spf) {
 			sort.Sort(spf)
 		}
@@ -137,31 +139,66 @@ func MakeSortedPublicFunctionMap(pubFuncs []PublicFunction) map[string]SortableP
 	return m
 }
 
+// FindPublicFunctionsByFunctionVersions returns all public functions that match
+// the given function versions. Public functions are returned in no particular
+// order.
 func FindPublicFunctionsByFunctionVersions(ctx context.Context, funcVers ...FunctionVersion) ([]PublicFunction, error) {
 	if len(funcVers) == 0 {
 		return nil, nil
 	}
 
 	matchNameAndVersion := []bson.M{}
+	matchNameAndLatestVersion := map[string]struct{}{}
 	for _, fv := range funcVers {
+		if fv.IsLatest() {
+			matchNameAndLatestVersion[fv.Name] = struct{}{}
+			continue
+		}
+
 		matchNameAndVersion = append(matchNameAndVersion, bson.M{
-			FunctionNameKey: fv.Name,
-			// kim: NOTE: need to handle latest (i.e. either "@latest" or just
-			// the function name without an "@latest")
+			FunctionNameKey:    fv.Name,
 			FunctionVersionKey: fv.Version,
 		})
 	}
-	q := bson.M{
-		"$or": matchNameAndVersion,
+
+	explicitVersionPubFuncs := []PublicFunction{}
+	if len(matchNameAndVersion) > 0 {
+		// Get public functions with explicit versions.
+		q := bson.M{
+			"$or": matchNameAndVersion,
+		}
+		res, err := evergreen.GetEnvironment().DB().Collection(Collection).Find(ctx, q)
+		if err != nil {
+			return nil, errors.Wrap(err, "finding public functions by function version")
+		}
+		if err := res.All(ctx, &explicitVersionPubFuncs); err != nil {
+			return nil, errors.Wrap(err, "decoding public functions")
+		}
 	}
-	res, err := evergreen.GetEnvironment().DB().Collection(Collection).Find(ctx, q)
-	if err != nil {
-		return nil, errors.Wrap(err, "finding public functions by function version")
+
+	latestVersionPubFuncs := []PublicFunction{}
+	if len(matchNameAndLatestVersion) > 0 {
+		// Get latest versions of public functions.
+		latestVersionNames := make([]string, 0, len(matchNameAndLatestVersion))
+		for name := range matchNameAndLatestVersion {
+			latestVersionNames = append(latestVersionNames, name)
+		}
+		// Source: https://www.mongodb.com/community/forums/t/selecting-documents-with-largest-value-of-a-field/107032
+		cur, err := evergreen.GetEnvironment().DB().Collection(Collection).Aggregate(ctx, []bson.M{
+			{"$match": bson.M{FunctionNameKey: bson.M{"$in": latestVersionNames}}},
+			{"$sort": bson.M{FunctionNameKey: 1, FunctionVersionKey: -1}},
+			{"$group": bson.M{"_id": "$name", "doc_with_latest_version": bson.M{"$first": "$$ROOT"}}},
+			{"$replaceWith": "$doc_with_latest_version"},
+		})
+		if err != nil {
+			return nil, errors.Wrapf(err, "finding latest versions of public functions %s", latestVersionNames)
+		}
+		if err := cur.All(ctx, &latestVersionPubFuncs); err != nil {
+			return nil, errors.Wrapf(err, "decoding latest versions of public functions '%s'", latestVersionNames)
+		}
 	}
-	pubFuncs := []PublicFunction{}
-	if err := res.All(ctx, &pubFuncs); err != nil {
-		return nil, errors.Wrap(err, "decoding public functions")
-	}
+
+	pubFuncs := append(explicitVersionPubFuncs, latestVersionPubFuncs...)
 
 	if err := resolveParams(pubFuncs); err != nil {
 		return nil, err

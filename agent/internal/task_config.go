@@ -90,7 +90,7 @@ func (t *TaskConfig) GetExecTimeout() int {
 // NewTaskConfig validates that the required inputs are given and populates the
 // information necessary for a task to run. It is generally preferred to use
 // this function over initializing the TaskConfig struct manually.
-func NewTaskConfig(workDir string, d *apimodels.DistroView, pubFuncs []model.PublicFunction, p *model.Project, t *task.Task, r *model.ProjectRef, patchDoc *patch.Patch, e *apimodels.ExpansionsAndVars) (*TaskConfig, error) {
+func NewTaskConfig(workDir string, d *apimodels.DistroView, p *model.Project, t *task.Task, r *model.ProjectRef, patchDoc *patch.Patch, e *apimodels.ExpansionsAndVars) (*TaskConfig, error) {
 	if p == nil {
 		return nil, errors.Errorf("project '%s' is nil", t.Project)
 	}
@@ -138,7 +138,6 @@ func NewTaskConfig(workDir string, d *apimodels.DistroView, pubFuncs []model.Pub
 		Distro:            d,
 		ProjectRef:        *r,
 		Project:           *p,
-		PublicFuncs:       model.MakeSortedPublicFunctionMap(pubFuncs),
 		Task:              *t,
 		BuildVariant:      *bv,
 		Expansions:        e.Expansions,
