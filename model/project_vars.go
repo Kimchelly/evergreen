@@ -906,7 +906,7 @@ func (projectVars *ProjectVars) checkAndRunParameterStoreOp(ctx context.Context,
 		"project_id": projectVars.Id,
 		"epic":       "DEVPROD-5552",
 	}))
-	isPSEnabled, err := isParameterStoreEnabledForProject(ctx, ref, false)
+	isPSEnabled, err := isParameterStoreEnabledForProject(ctx, ref, true)
 	grip.Error(message.WrapError(err, message.Fields{
 		"message":    "could not check if Parameter Store is enabled for project; assuming it's disabled and will not use Parameter Store",
 		"op":         opName,
