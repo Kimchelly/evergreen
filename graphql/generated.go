@@ -1053,9 +1053,9 @@ type ComplexityRoot struct {
 		BbCreateTicket                func(childComplexity int, taskID string, execution *int) int
 		ClearMySubscriptions          func(childComplexity int) int
 		CopyDistro                    func(childComplexity int, opts model.CopyDistroOpts) int
-		CopyProject                   func(childComplexity int, project model.CopyProjectOpts, requestS3Creds *bool) int
+		CopyProject                   func(childComplexity int, project model.CopyProjectOpts) int
 		CreateDistro                  func(childComplexity int, opts CreateDistroInput) int
-		CreateProject                 func(childComplexity int, project model.APIProjectRef, requestS3Creds *bool) int
+		CreateProject                 func(childComplexity int, project model.APIProjectRef) int
 		CreatePublicKey               func(childComplexity int, publicKeyInput PublicKeyInput) int
 		DeactivateStepbackTask        func(childComplexity int, opts DeactivateStepbackTaskInput) int
 		DefaultSectionToRepo          func(childComplexity int, opts DefaultSectionToRepoInput) int
@@ -1444,7 +1444,6 @@ type ComplexityRoot struct {
 	}
 
 	ProjectCreationConfig struct {
-		JiraProject       func(childComplexity int) int
 		RepoExceptions    func(childComplexity int) int
 		RepoProjectLimit  func(childComplexity int) int
 		TotalProjectLimit func(childComplexity int) int
@@ -2525,8 +2524,8 @@ type MutationResolver interface {
 	SchedulePatch(ctx context.Context, patchID string, configure PatchConfigure) (*model.APIPatch, error)
 	AttachProjectToNewRepo(ctx context.Context, project MoveProjectInput) (*model.APIProjectRef, error)
 	AttachProjectToRepo(ctx context.Context, projectID string) (*model.APIProjectRef, error)
-	CreateProject(ctx context.Context, project model.APIProjectRef, requestS3Creds *bool) (*model.APIProjectRef, error)
-	CopyProject(ctx context.Context, project model.CopyProjectOpts, requestS3Creds *bool) (*model.APIProjectRef, error)
+	CreateProject(ctx context.Context, project model.APIProjectRef) (*model.APIProjectRef, error)
+	CopyProject(ctx context.Context, project model.CopyProjectOpts) (*model.APIProjectRef, error)
 	DeactivateStepbackTask(ctx context.Context, opts DeactivateStepbackTaskInput) (bool, error)
 	DefaultSectionToRepo(ctx context.Context, opts DefaultSectionToRepoInput) (*string, error)
 	DeleteGithubAppCredentials(ctx context.Context, opts DeleteGithubAppCredentialsInput) (*DeleteGithubAppCredentialsPayload, error)
@@ -6587,7 +6586,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CopyProject(childComplexity, args["project"].(model.CopyProjectOpts), args["requestS3Creds"].(*bool)), true
+		return e.complexity.Mutation.CopyProject(childComplexity, args["project"].(model.CopyProjectOpts)), true
 	case "Mutation.createDistro":
 		if e.complexity.Mutation.CreateDistro == nil {
 			break
@@ -6609,7 +6608,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CreateProject(childComplexity, args["project"].(model.APIProjectRef), args["requestS3Creds"].(*bool)), true
+		return e.complexity.Mutation.CreateProject(childComplexity, args["project"].(model.APIProjectRef)), true
 	case "Mutation.createPublicKey":
 		if e.complexity.Mutation.CreatePublicKey == nil {
 			break
@@ -8599,12 +8598,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.ProjectBuildVariant.Tasks(childComplexity), true
 
-	case "ProjectCreationConfig.jiraProject":
-		if e.complexity.ProjectCreationConfig.JiraProject == nil {
-			break
-		}
-
-		return e.complexity.ProjectCreationConfig.JiraProject(childComplexity), true
 	case "ProjectCreationConfig.repoExceptions":
 		if e.complexity.ProjectCreationConfig.RepoExceptions == nil {
 			break
@@ -13720,11 +13713,6 @@ func (ec *executionContext) field_Mutation_copyProject_args(ctx context.Context,
 		return nil, err
 	}
 	args["project"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "requestS3Creds", ec.unmarshalOBoolean2ᚖbool)
-	if err != nil {
-		return nil, err
-	}
-	args["requestS3Creds"] = arg1
 	return args, nil
 }
 
@@ -13834,11 +13822,6 @@ func (ec *executionContext) field_Mutation_createProject_args(ctx context.Contex
 		return nil, err
 	}
 	args["project"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "requestS3Creds", ec.unmarshalOBoolean2ᚖbool)
-	if err != nil {
-		return nil, err
-	}
-	args["requestS3Creds"] = arg1
 	return args, nil
 }
 
@@ -19576,8 +19559,6 @@ func (ec *executionContext) fieldContext_AdminSettings_projectCreation(_ context
 				return ec.fieldContext_ProjectCreationConfig_repoProjectLimit(ctx, field)
 			case "repoExceptions":
 				return ec.fieldContext_ProjectCreationConfig_repoExceptions(ctx, field)
-			case "jiraProject":
-				return ec.fieldContext_ProjectCreationConfig_jiraProject(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type ProjectCreationConfig", field.Name)
 		},
@@ -38137,7 +38118,7 @@ func (ec *executionContext) _Mutation_createProject(ctx context.Context, field g
 		ec.fieldContext_Mutation_createProject,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().CreateProject(ctx, fc.Args["project"].(model.APIProjectRef), fc.Args["requestS3Creds"].(*bool))
+			return ec.resolvers.Mutation().CreateProject(ctx, fc.Args["project"].(model.APIProjectRef))
 		},
 		nil,
 		ec.marshalNProject2ᚖgithubᚗcomᚋevergreenᚑciᚋevergreenᚋrestᚋmodelᚐAPIProjectRef,
@@ -38288,7 +38269,7 @@ func (ec *executionContext) _Mutation_copyProject(ctx context.Context, field gra
 		ec.fieldContext_Mutation_copyProject,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.resolvers.Mutation().CopyProject(ctx, fc.Args["project"].(model.CopyProjectOpts), fc.Args["requestS3Creds"].(*bool))
+			return ec.resolvers.Mutation().CopyProject(ctx, fc.Args["project"].(model.CopyProjectOpts))
 		},
 		nil,
 		ec.marshalNProject2ᚖgithubᚗcomᚋevergreenᚑciᚋevergreenᚋrestᚋmodelᚐAPIProjectRef,
@@ -50000,35 +49981,6 @@ func (ec *executionContext) fieldContext_ProjectCreationConfig_repoExceptions(_ 
 				return ec.fieldContext_OwnerRepo_repo(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type OwnerRepo", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _ProjectCreationConfig_jiraProject(ctx context.Context, field graphql.CollectedField, obj *model.APIProjectCreationConfig) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_ProjectCreationConfig_jiraProject,
-		func(ctx context.Context) (any, error) {
-			return obj.JiraProject, nil
-		},
-		nil,
-		ec.marshalOString2string,
-		true,
-		false,
-	)
-}
-
-func (ec *executionContext) fieldContext_ProjectCreationConfig_jiraProject(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "ProjectCreationConfig",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -83409,7 +83361,7 @@ func (ec *executionContext) unmarshalInputProjectCreationConfigInput(ctx context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"totalProjectLimit", "repoProjectLimit", "repoExceptions", "jiraProject"}
+	fieldsInOrder := [...]string{"totalProjectLimit", "repoProjectLimit", "repoExceptions"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -83437,13 +83389,6 @@ func (ec *executionContext) unmarshalInputProjectCreationConfigInput(ctx context
 				return it, err
 			}
 			it.RepoExceptions = data
-		case "jiraProject":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("jiraProject"))
-			data, err := ec.unmarshalOString2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-			it.JiraProject = data
 		}
 	}
 
@@ -98963,8 +98908,6 @@ func (ec *executionContext) _ProjectCreationConfig(ctx context.Context, sel ast.
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "jiraProject":
-			out.Values[i] = ec._ProjectCreationConfig_jiraProject(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
