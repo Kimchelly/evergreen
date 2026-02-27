@@ -566,7 +566,6 @@ func TestGetLegacyProjectEvents(t *testing.T) {
 	require.Empty(t, eventLog.Before.ProjectRef.WorkstationConfig.SetupCommands)
 }
 
-
 func TestHideBranch(t *testing.T) {
 	require.NoError(t, db.ClearCollections(model.RepoRefCollection, model.ProjectRefCollection, model.ProjectVarsCollection, fakeparameter.Collection, model.ProjectAliasCollection))
 

@@ -52,7 +52,6 @@ func FindProjectById(ctx context.Context, id string, includeRepo bool, includePr
 	return p, nil
 }
 
-
 // CreateProject creates a new project ref from the given one and performs other
 // initial setup for new projects such as populating initial project variables
 // and creating new webhooks. If the given project ref already has container
