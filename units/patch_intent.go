@@ -1649,6 +1649,8 @@ func (j *patchIntentProcessor) getEvergreenRulesForStatuses(ctx context.Context,
 // and the changed files in the patch. It removes ignored variants from all relevant patch fields
 // and returns the list of ignored variant names.
 func (j *patchIntentProcessor) filterOutIgnoredVariants(ctx context.Context, patchDoc *patch.Patch, patchedProject *model.Project) []string {
+	j.logMergeQueuePathFilteringUsage(ctx, patchDoc, patchedProject)
+
 	ignoredVariants := []string{}
 	if j.skipFilteringIgnoredVariants(ctx, patchDoc, patchedProject) {
 		return ignoredVariants
@@ -1702,6 +1704,38 @@ func (j *patchIntentProcessor) filterOutIgnoredVariants(ctx context.Context, pat
 	patchDoc.Tasks = filteredTasks
 
 	return ignoredVariants
+}
+
+// TODO (DEVPROD-36467): this is temporary logging to confirm projects using
+// merge queue path filters (whether it's disabled or not). Remove once done
+// verifying.
+func (j *patchIntentProcessor) logMergeQueuePathFilteringUsage(ctx context.Context, patchDoc *patch.Patch, patchedProject *model.Project) {
+	if !patchDoc.IsMergeQueuePatch() {
+		return
+	}
+	if patchedProject == nil {
+		return
+	}
+
+	var bvsWithPaths []string
+	for _, vt := range patchDoc.VariantsTasks {
+		if bv := patchedProject.FindBuildVariant(vt.Variant); bv != nil && len(bv.Paths) > 0 {
+			bvsWithPaths = append(bvsWithPaths, vt.Variant)
+		}
+	}
+	if len(bvsWithPaths) == 0 {
+		return
+	}
+
+	grip.Info(ctx, message.Fields{
+		"message":             "merge queue patch includes build variants with path filtering configured",
+		"ticket":              "DEVPROD-36467",
+		"job":                 j.ID(),
+		"patch_id":            patchDoc.Id.Hex(),
+		"project_id":          patchDoc.Project,
+		"variants_with_paths": bvsWithPaths,
+		"is_project_merge_queue_path_filtering_disabled": patchedProject.DisableMergeQueuePathFiltering,
+	})
 }
 
 // skipFilteringIgnoredVariants verifies that the patch should apply filtering, i.e. there are changed files,
